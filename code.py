@@ -778,9 +778,10 @@ def press_key(key_idx):
 
     # --- MIDI commands (may trigger switch_page which sets _page_switched) ---
     cmd_step = step + 1   # config uses 1-based step numbers
+    prev_active = _active_key
     _active_key = key_idx
     exec_commands(kc["commands"].get((cmd_step, "dn"), []))
-    _active_key = None
+    _active_key = prev_active
 
     # --- LEDs and labels — skipped if a page switch just happened ---
     if not _page_switched:
@@ -874,9 +875,10 @@ def longpress_key(key_idx):
         # If key was never short-pressed (cycle_pos=-1), use step 1
         cmd_step = max(1, cycle_pos[key_idx] + 1)
 
+    prev_active = _active_key
     _active_key = key_idx
     exec_commands(kc["commands"].get((cmd_step, "ldn"), []))
-    _active_key = None
+    _active_key = prev_active
     display_dirty = True
 
 
@@ -891,12 +893,16 @@ def release_key(key_idx, long_press=False):
     kc        = cfg["keys"][key_idx]
     longcycle = kc["longcycle"]
 
+    global _active_key
+    prev_active = _active_key
+    _active_key = key_idx
     if long_press:
         cmd_step = (long_cycle_pos[key_idx] + 1) if longcycle > 0 else (cycle_pos[key_idx] + 1)
         exec_commands(kc["commands"].get((cmd_step, "lup"), []))
     else:
         cmd_step = cycle_pos[key_idx] + 1
         exec_commands(kc["commands"].get((cmd_step, "up"), []))
+    _active_key = prev_active
 
 
 def switch_page(page_num):
