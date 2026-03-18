@@ -184,7 +184,7 @@ except (IndexError, AttributeError) as e:
     print("USB MIDI unavailable:", e)
     _usb_midi_iface = None
 
-# MIDI INPUT — for ext_capture_cc (virtual key control)
+# MIDI INPUT ï¿½ for ext_capture_cc (virtual key control)
 try:
     _usb_midi_in = adafruit_midi.MIDI(midi_in=_usb_midi.ports[0], in_channel=tuple(range(16)))
 except (IndexError, AttributeError, ValueError) as e:
@@ -747,6 +747,10 @@ def press_key(key_idx):
         if group_cycle_reset and prev_active != key_idx:
             cycle_pos[key_idx] = -1
         group_active[group] = key_idx
+        # Virtual key won't reach the pixels.show() below â€” flush now so
+        # cleared physical-key LEDs actually update on the hardware.
+        if key_idx >= NUM_PHYSICAL_KEYS:
+            pixels.show()
 
     # --- Advance cycle ---
     cycle_pos[key_idx] = (cycle_pos[key_idx] + 1) % total_cycles
@@ -820,6 +824,9 @@ def longpress_key(key_idx):
             if prev_active != key_idx:
                 long_cycle_pos[key_idx] = -1  # reset cycle on group switch
             long_group_active[longgroup] = key_idx
+            # Flush LED changes when a virtual key clears a physical key's LEDs
+            if key_idx >= NUM_PHYSICAL_KEYS and prev_active is not None and prev_active < NUM_PHYSICAL_KEYS:
+                pixels.show()
 
         # Advance independent long-press cycle
         long_cycle_pos[key_idx] = (long_cycle_pos[key_idx] + 1) % longcycle
@@ -1051,6 +1058,10 @@ def _process_capture_cc(channel, control, value):
     global display_dirty
     cap_ch = cfg.get("capture_ch", -1)
     cap_cc = cfg.get("capture_cc", -1)
+    
+    # DEBUG
+    print(f"CC RX: ch={channel} cc={control} val={value} | expect ch={cap_ch} cc={cap_cc}")
+    
     if cap_ch < 0 or cap_cc < 0:
         return False
     if channel != cap_ch or control != cap_cc:
@@ -1058,6 +1069,9 @@ def _process_capture_cc(channel, control, value):
 
     key_idx = value & 0x1F          # lower 5 bits = key number
     action  = (value >> 5) & 0x03   # upper 2 bits = action type
+
+    # DEBUG
+    print(f"  -> KEY {key_idx} action {action}")
 
     if key_idx >= NUM_TOTAL_KEYS:
         return False
