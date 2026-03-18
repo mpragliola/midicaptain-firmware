@@ -1,0 +1,220 @@
+; =============================================================================
+; aliases.txt — named aliases for MIDI CC / PC / note numbers
+; Used in page config as: [1][CC][tx_gain][64]
+; Format:  alias = number
+; Lines starting with ; are comments.
+; =============================================================================
+
+; --- AmpliTube TONEX Pedal — global controls ---------------------------------
+tx_preset_on  = 12   ; Preset on/off  (0=off  127=on)
+tx_expr       = 11   ; Expression pedal
+tx_patch_bank = 0    ; MIDI patch bank
+tx_preset_dn  = 86   ; Preset down (toggle)
+tx_preset_up  = 87   ; Preset up   (toggle)
+tx_bpm        = 88   ; BPM
+tx_bank_dn    = 89   ; Bank down   (toggle)
+tx_bank_up    = 90   ; Bank up     (toggle)
+tx_tuner      = 9    ; Tuner       (toggle)
+tx_tap        = 10   ; Tap tempo   (toggle)
+
+; --- Main parameters ---------------------------------------------------------
+tx_gain       = 102
+tx_bass       = 23
+tx_mid        = 25
+tx_treble     = 28
+
+; --- Alt parameters ----------------------------------------------------------
+tx_comp_thr   = 19   ; Comp threshold
+tx_gate_thr   = 15   ; Gate threshold
+tx_presence   = 106
+tx_depth      = 107
+
+; --- Model -------------------------------------------------------------------
+tx_mdl_vol    = 103
+tx_mdl_mix    = 104
+
+; --- Gate --------------------------------------------------------------------
+tx_gate_pwr   = 14   ; 0=off  127=on
+tx_gate_rel   = 16
+tx_gate_dep   = 17
+tx_gate_pos   = 13   ; 0=first  127=post amp
+
+; --- Comp --------------------------------------------------------------------
+tx_comp_pwr   = 18   ; 0=off  127=on
+tx_comp_gain  = 20
+tx_comp_atk   = 21
+tx_comp_pos   = 22
+
+; --- EQ ----------------------------------------------------------------------
+tx_eq_basshz  = 24
+tx_eq_midq    = 26
+tx_eq_midhz   = 27
+tx_eq_trehz   = 29
+tx_eq_pos     = 30
+
+; --- VIR (virtual cab) -------------------------------------------------------
+tx_vir_reso   = 108
+tx_vir_mic1   = 109  ; 0=cond  1=dyn  2=rbn
+tx_vir_mic1x  = 110
+tx_vir_mic1z  = 111
+tx_vir_mic2   = 112  ; 0=cond  1=dyn  2=rbn
+tx_vir_mic2x  = 113
+tx_vir_mic2z  = 114
+tx_vir_blend  = 115
+
+; --- Mod (shared) ------------------------------------------------------------
+tx_mod_pwr    = 32   ; 0=off  127=on
+tx_mod_type   = 33   ; 0=chorus  1=tremolo  2=phaser  3=flanger  4=rotary
+tx_mod_pos    = 31   ; 0=pre amp  127=post amp
+
+; --- Mod: Chorus -------------------------------------------------------------
+tx_cho_sync   = 34
+tx_cho_rate   = 35
+tx_cho_dep    = 36
+tx_cho_lvl    = 37
+
+; --- Mod: Tremolo ------------------------------------------------------------
+tx_tre_sync   = 38
+tx_tre_rate   = 39
+tx_tre_shp    = 40
+tx_tre_sprd   = 41
+tx_tre_lvl    = 42
+
+; --- Mod: Phaser -------------------------------------------------------------
+tx_pha_sync   = 43
+tx_pha_rate   = 44
+tx_pha_dep    = 45
+tx_pha_lvl    = 46
+
+; --- Mod: Flanger ------------------------------------------------------------
+tx_fla_sync   = 47
+tx_fla_rate   = 48
+tx_fla_dep    = 49
+tx_fla_fbk    = 50
+tx_fla_lvl    = 51
+
+; --- Mod: Rotary -------------------------------------------------------------
+tx_rot_sync   = 52
+tx_rot_spd    = 53
+tx_rot_rad    = 54
+tx_rot_sprd   = 55
+tx_rot_lvl    = 56
+
+; --- Delay (shared) ----------------------------------------------------------
+tx_dly_pwr    = 2    ; 0=off  127=on
+tx_dly_type   = 3    ; 0=digital  1=tape
+tx_dly_pos    = 1    ; 0=pre amp  127=post amp
+
+; --- Delay: Digital ----------------------------------------------------------
+tx_ddly_sync  = 4
+tx_ddly_time  = 5
+tx_ddly_fbk   = 6
+tx_ddly_mode  = 7    ; 0=normal  64=ping.pong
+tx_ddly_mix   = 8
+
+; --- Delay: Tape -------------------------------------------------------------
+tx_tdly_sync  = 91
+tx_tdly_time  = 92
+tx_tdly_fbk   = 93
+tx_tdly_mode  = 94   ; 0=normal  64=ping.pong
+tx_tdly_mix   = 95
+
+; --- Reverb (shared) ---------------------------------------------------------
+tx_rev_pwr    = 75   ; 0=off  127=on
+tx_rev_type   = 85   ; 0-5 = spring1..4, room, plate
+tx_rev_pos    = 84   ; 0=post amp  127=last
+
+; --- Reverb: Spring 1 --------------------------------------------------------
+tx_sp1_time   = 59
+tx_sp1_pre    = 60
+tx_sp1_col    = 61
+tx_sp1_mix    = 62
+
+; --- Reverb: Spring 2 --------------------------------------------------------
+tx_sp2_time   = 63
+tx_sp2_pre    = 64
+tx_sp2_col    = 65
+tx_sp2_mix    = 66
+
+; --- Reverb: Spring 3 --------------------------------------------------------
+tx_sp3_time   = 67
+tx_sp3_pre    = 68
+tx_sp3_col    = 69
+tx_sp3_mix    = 70
+
+; =============================================================================
+; Neural DSP Quad Cortex
+; =============================================================================
+
+; --- Bank select (used with PC to recall presets/setlists) -------------------
+qc_bank_msb   = 0    ; Bank MSB  (0=presets 0-127, 1=presets 128-256)
+qc_bank_lsb   = 32   ; Bank LSB / Setlist  (0=Factory, 1=My Presets, 2-12=User)
+
+; --- Expression pedals -------------------------------------------------------
+qc_exp1       = 1    ; Expression pedal 1  (0=heel  127=toe)
+qc_exp2       = 2    ; Expression pedal 2  (0=heel  127=toe)
+
+; --- Footswitch bypass (A-H) ------------------------------------------------
+qc_sw_a       = 35   ; Footswitch A bypass  (0-63=bypass  64-127=enable)
+qc_sw_b       = 36   ; Footswitch B bypass
+qc_sw_c       = 37   ; Footswitch C bypass
+qc_sw_d       = 38   ; Footswitch D bypass
+qc_sw_e       = 39   ; Footswitch E bypass
+qc_sw_f       = 40   ; Footswitch F bypass
+qc_sw_g       = 41   ; Footswitch G bypass
+qc_sw_h       = 42   ; Footswitch H bypass
+
+; --- Scene / mode / performance ----------------------------------------------
+qc_scene      = 43   ; Scene select  (0-7 = Scene A-H)
+qc_tempo      = 44   ; Tap tempo / BPM  (0-127)
+qc_tuner      = 45   ; Tuner  (0-63=off  64-127=on)
+qc_gigview    = 46   ; Gig View  (0-63=off  64-127=on)
+qc_mode       = 47   ; Mode  (0=Preset  1=Scene  2=Stomp)
+
+; --- Looper X ----------------------------------------------------------------
+qc_loop_open  = 48   ; Open/close Looper X  (0-63=open  64-127=close)
+qc_loop_dup   = 49   ; Duplicate  (64-127=trigger)
+qc_loop_1shot = 50   ; One Shot  (64-127=enable)
+qc_loop_half  = 51   ; Half Speed  (64-127=enable)
+qc_loop_punch = 52   ; Punch In/Out  (0-63=out  64-127=in)
+qc_loop_rec   = 53   ; Record
+qc_loop_rev   = 54   ; Reverse  (64-127=enable)
+qc_loop_undo  = 55   ; Undo/Redo  (64-127=trigger)
+qc_loop_play  = 56   ; Play/Stop  (64-127=trigger)
+qc_loop_pmode = 57   ; Parameter mode  (0-13)
+qc_loop_rout1 = 58   ; Routing 1
+qc_loop_rout2 = 59   ; Routing 2
+qc_loop_rout3 = 60   ; Routing 3
+qc_loop_rout4 = 61   ; Routing 4
+
+; --- PC duplicate handling ---------------------------------------------------
+qc_pc_dup     = 62   ; Duplicate PC handling  (0-63=ignore  64-127=allow)
+
+; =============================================================================
+; Line 6 HX Stomp
+; =============================================================================
+
+; --- Pedals & footswitches --------------------------------------------------
+line6hxstomp_exp1     = 1    ; Expression pedal 1  (0-127)
+line6hxstomp_exp2     = 2    ; Expression pedal 2  (0-127)
+line6hxstomp_fs1      = 49   ; Footswitch 1  (0-127)
+line6hxstomp_fs2      = 50   ; Footswitch 2  (0-127)
+line6hxstomp_fs3      = 51   ; Footswitch 3  (0-127)
+line6hxstomp_fs4      = 52   ; Footswitch 4  (0-127)
+line6hxstomp_fs5      = 53   ; Footswitch 5  (0-127)
+
+; --- 1-Switch Looper --------------------------------------------------------
+line6hxstomp_loop_rec  = 60  ; Record/Overdub  (0-63=overdub  64-127=record)
+line6hxstomp_loop_play = 61  ; Play/Stop  (0-63=stop  64-127=play)
+line6hxstomp_loop_once = 62  ; Play Once  (64-127=trigger)
+line6hxstomp_loop_undo = 63  ; Undo/Redo  (64-127=trigger)
+line6hxstomp_loop_rev  = 65  ; Forward/Reverse  (0-63=fwd  64-127=rev)
+line6hxstomp_loop_spd  = 66  ; Full/Half Speed  (0-63=full  64-127=half)
+
+; --- Additional controls ----------------------------------------------------
+line6hxstomp_tempo     = 64  ; Tap Tempo  (64-127=tap)
+line6hxstomp_tuner     = 68  ; Tuner on/off  (0-127)
+line6hxstomp_snapshot  = 69  ; Snapshot select  (0=snap1  1=snap2  2=snap3  8=next  9=prev)
+line6hxstomp_bypass    = 70  ; All Bypass  (0-63=bypass  64-127=on)
+line6hxstomp_fsmode    = 71  ; Footswitch mode  (0=stomp  1=scroll  2=preset  3=snapshot  4=next  5=prev)
+line6hxstomp_preset    = 72  ; Prev/Next Preset  (0-63=prev  64-127=next)

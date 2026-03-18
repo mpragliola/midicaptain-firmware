@@ -1,0 +1,184 @@
+[global]
+; from 0 to 100
+led_brightness = [50]
+
+; from 0 to 100
+screen_brightness = [50]
+
+; background color. Defaults to black
+page_bg = [0x300000]
+
+; background image, under "wallpaper/" folder. If defined, it overrides page_bg.
+; It has to be a 240x20 .bpm file, extension is not needed.
+page_bg_img = [wp1]
+
+; channel and CC# to capture. Refer to CAPTURE.md for details
+ext_capture_cc = [1][30]
+
+; macros. Up to nine macros (cmd1..9) can be defined globally
+cmd1 = [1][PC][0] [1][CC][20][127]
+
+; default 0 (no thru), =1 allows MIDI Thru
+midi_thru = [1]
+
+[page]
+; page_name is the name of the page shown in the app. It can be any string
+; up to 9 characters.
+page_name = [MAIN PAGE]
+
+; background color of the page name label
+color = [0x000000]
+bgcolor = [0xff0000]
+
+; init_commands is the list of commands executed when the page is loaded.
+; Use [KEY][n][c][lc] to simulate pressing a key on page load (replaces init_key).
+init_commands = [1][CC][32][2] [KEY][0][1][]
+
+; group_cycleX, where X is the group number, can be 0 or 1.
+; If 0 (default), if I press a key in group X and it wasn't already
+; the last pressed, then the cycle restarts to 1. If 1, the cycle
+; pauses irrelevant of the other keys.
+group_cycle1 = [1]
+
+; Page macros. cmdX (where 1<=X<=9) is a command macro. It overrides global
+; macros. 
+cmd1 = [1][PC][0] [1][CC][20][127]
+
+[key0]
+; group is the key group number. Keys in the same group behave like a
+; radio button group, when one is pressed the others turn off
+; group 0 means no group. Groups are from 1 to 31.
+group = [1]
+
+; longgroup is the same as group but for long press cycles.
+; Keys in the same longgroup behave like a radio button group for long presses.
+longgroup = [1]
+
+; cycle is the number of steps in the key cycle from 0 to 9. 
+; If 1, the key does not cycle.
+cycle = [3]
+
+; long press can control an independent cycle. If 0 or undefined, it
+; defaults at no cycle, >0 is the number of steps.
+longcycle = [2]
+
+; stomp = 0 - no effect on the 6 sub-panels in main visualization
+; stomp = 1 - reflect cycle
+; stomp = 2 - reflect longcycle
+; with this, you can have a feedback of the button state on the corresponding
+; 3x2 blocks of the 6 available in main visualization. You can have the button
+; show either the main or the sub (longpress) cycle. The background color will
+; be the first non-null color of the LED definition. While the 3 LEDS provide
+; reference, using blocks allows you to use labels (although limited to 5 chars). 
+stompmode = [2]
+
+; ledX is the color of the key LED per cycle step. X is the cycle step number.
+; a null color ([] or [-]) means the LED is unchanged.
+; black color (0x000000) means the LED is off.
+; ledXl is the same for the long press cycle step. 
+led1 = [0x00ff00][-][0x00ff00]
+led2 = [0x0000ff][-][0x0000ff]
+led3 = [0x0000ff][-][0x00ff00]
+led1l = [-][0xffffff][-]
+led2l = [-][0xff00ff][-]
+
+; labelX is the text on the key per cycle step. X is the cycle step number.
+; use label1 when there's no cycle. A colon (:) in the label creates a line 
+; break, but only for a max of 2 rows and 2x8 characters.
+label1 = [ROW1:ROW2]
+label2 = [Foo]
+label3 = [Bar]
+; labelXl is the same for the long press cycle step. This label is shown
+; only when defined and under the main label
+label1l = [B ON]
+label2l = [B OFF]
+
+; keyXY is the command or list of commands executed per key
+; and action. X is the cycle step and Y is the action:
+; dn = on press, up = on release, ldn = long press, lup = long press
+key1dn = [1][PC][1][] 
+key2dn = [1][PC][2][] 
+key3dn = [1][PC][3][]  
+;key1up = [1][PC][4][] 
+;key2up = [1][PC][5][] 
+;key3up = [1][PC][6][]  
+; for actions ldn and lup - the number and range of the cycle step
+; refers to main cycle if longcycle is 0, otherwise it refers to the
+; long press cycle.
+key1ldn = [1][CC][7][0] 
+key2ldn = [1][CC][7][127]
+;key3ldn = [1][PC][9][]
+;key1lup = [1][PC][10][]
+;key2lup = [1][PC][11][]
+;key3lup = [1][PC][12][]
+
+
+
+[key1]
+group = [1]
+cycle = [2]
+led1 = [0x00ff00][0x00ffff][0x00ffff]
+led2 = [0x0000ff][0x00ffff][0x0000ff]
+
+[key2]
+group = [2]
+led1 = [0x00ff00][0x00ffff][0x00ffff]
+
+[key3]
+group = [2]
+led1 = [0x00ff00][0x00ffff][0x00ffff]
+
+[key4]
+cycle = [2]
+led1 = [0x000000][0x000000][0x00ffff]
+led2 = [0x00ff00][0x00ffff][0x00ffff]
+key1dn = [1][CC][4][0]
+key2dn = [1][CC][4][127]
+; if you don't want the main label to change, you can
+; leave it empty and use labelXd/u. They will use the
+; secondary label. 
+label1d = [H ON]
+label2d = [H OFF]
+
+[key5]
+key1dn = [PAGE][1][][]
+
+; ===================================================================
+; VIRTUAL KEYS (6-31)
+; ===================================================================
+; Keys 6-31 are virtual: no physical button, no LEDs.
+; They are triggered via ext_capture_cc (see CAPTURE.md) or
+; [KEY][n] commands from other keys or init_commands.
+;
+; Virtual keys support all properties EXCEPT led (ledX, ledXl)
+; since there are no physical LEDs. They DO support:
+; group, longgroup, cycle, longcycle, stompmode, labels, and
+; all key commands (keyXdn, keyXup, keyXldn, keyXlup).
+;
+; Note: stompmode on virtual keys may not map to a display
+; sub-panel (the 6 panels correspond to physical keys 0-5).
+;
+; Virtual keys don't need to be contiguous � define only the
+; ones you need.
+;
+; To trigger key 6 via ext_capture_cc (e.g. ch1/CC#30):
+;   press:          send CC#30 value 6   (0x06)
+;   long press:     send CC#30 value 38  (0x26)
+;   key up:         send CC#30 value 70  (0x46)
+;   long press up:  send CC#30 value 102 (0x66)
+
+[key6]
+; example: external footswitch toggles delay on/off
+group = [1]
+cycle = [2]
+label1 = [DLY ON]
+label2 = [DLY OF]
+key1dn = [1][CC][2][127]
+key2dn = [1][CC][2][0]
+
+;[key10]
+; another virtual key � non-contiguous numbering is fine
+;cycle = [1]
+;label1 = [BOOST]
+;key1dn = [1][CC][50][127]
+;key1up = [1][CC][50][0]

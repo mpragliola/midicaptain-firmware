@@ -1,0 +1,6 @@
+__pycache__/
+.claude/
+.dropbox.device
+.fseventsd/
+System Volume Information/
+boot_out.txt

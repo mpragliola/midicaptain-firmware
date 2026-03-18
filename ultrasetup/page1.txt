@@ -1,0 +1,18 @@
+[page]
+page_name = [H90]
+color = [0x000000]
+bgcolor = [0xffffff]
+
+[key0]
+
+[key1]
+
+[key2]
+
+[key3]
+
+[key4]
+
+[key5]
+key1up = [PAGE][2]
+key1ldn = [PAGE][0]

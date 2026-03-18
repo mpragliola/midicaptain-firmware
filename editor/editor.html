@@ -1,0 +1,42 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>MidiCaptain Editor</title>
+<link rel="stylesheet" href="editor.css">
+</head>
+<body>
+<div id="app">
+  <div class="bar">
+    <div class="logo"><b>MC</b> Editor</div>
+    <button class="b b1" onclick="openFolder()">Open Folder</button>
+    <button class="b" onclick="openFile()">Open File</button>
+    <button class="b" onclick="saveFile()">Save</button>
+    <button class="b" onclick="saveFileAs()">Save As</button>
+    <button class="b" onclick="addPage()">+ Page</button>
+    <button class="b" onclick="resetSim()" title="Reset simulation">Reset</button>
+    <span class="finfo" id="finfo"></span>
+    <span class="dirty-dot" title="Unsaved">&#9679;</span>
+  </div>
+  <div id="empty" class="empty">
+    <p>Open the <b>ultrasetup</b> folder to auto-detect pages,<br>or open a single page file.</p>
+    <p style="margin-top:10px"><button class="b b1" onclick="openFolder()">Open Folder</button> <button class="b" onclick="openFile()">Open File</button></p>
+    <p style="margin-top:10px;font-size:.72em;color:var(--t2)">Tap buttons to simulate &middot; Hold for long press</p>
+  </div>
+  <div id="editor" style="display:none">
+    <div class="ptabs" id="ptabs"></div>
+    <div class="dev" id="dev"></div>
+    <div id="vkbar"></div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px" id="srow">
+      <div class="sec open"><div class="sh" onclick="tog(this)">Page</div><div class="sb" id="pf"></div></div>
+      <div class="sec"><div class="sh" onclick="tog(this)">Global</div><div class="sb" id="gf"></div></div>
+    </div>
+    <div class="sec open" id="ksec"><div class="sh" onclick="tog(this)"><span id="ktitle">SW1</span></div><div class="sb" id="kf"></div></div>
+    <div class="sec"><div class="sh" onclick="tog(this)">Macros &amp; Groups</div><div class="sb" id="mf"></div></div>
+  </div>
+  <div id="aliasBox"></div>
+</div>
+<script src="editor.js"></script>
+</body>
+</html>
