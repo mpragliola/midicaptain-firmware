@@ -247,6 +247,8 @@ def exec_commands(cmds):
         # ---- Macro (reusable command defined in [page] as cmdN) ----------
         if a == "CMD":
             cmd_id = int(b) if (b and b != "-") else -1
+            if DEBUG:
+                print("[CMD] {} | macro {}".format(_key_name(_active_key) if _active_key is not None else "?", cmd_id))
             if cmd_id in cfg.get("cmds", {}):
                 exec_commands(cfg["cmds"][cmd_id])
             elif cmd_id in cfg.get("global_cmds", {}):
@@ -261,12 +263,16 @@ def exec_commands(cmds):
                 page_num = page_cur - 1
             else:
                 page_num = int(b) if (b and b != "-") else 0
+            if DEBUG:
+                print("[CMD] {} | PAGE {}".format(_key_name(_active_key) if _active_key is not None else "?", page_num))
             switch_page(page_num)
             continue
 
         # ---- Key simulation ---------------------------------------------
         if a == "KEY":
             key_num = int(b) if (b and b != "-") else -1
+            if DEBUG:
+                print("[CMD] {} | KEY {} step={} lstep={}".format(_key_name(_active_key) if _active_key is not None else "?", _key_name(key_num), c, d))
             if 0 <= key_num < NUM_TOTAL_KEYS and key_num != _active_key:
                 kc_key = cfg["keys"][key_num]
                 # Optional cycle step c (1-based in config)
@@ -305,6 +311,8 @@ def exec_commands(cmds):
             else:
                 num_int = _resolve(c)
             _pc_state[ch] = num_int
+            if DEBUG:
+                print("[TX]  {} | PC  ch={} prog={}".format(_key_name(_active_key) if _active_key is not None else "?", ch + 1, num_int))
             if _usb_midi_iface:
                 _usb_midi_iface.out_channel = ch
                 _usb_midi_iface.send(ProgramChange(num_int))
@@ -312,6 +320,8 @@ def exec_commands(cmds):
 
         elif b == "CC":
             num_int = _resolve(c)
+            if DEBUG:
+                print("[TX]  {} | CC  ch={} cc={} val={}".format(_key_name(_active_key) if _active_key is not None else "?", ch + 1, num_int, val))
             if _usb_midi_iface:
                 _usb_midi_iface.out_channel = ch
                 _usb_midi_iface.send(ControlChange(num_int, val))
@@ -319,6 +329,8 @@ def exec_commands(cmds):
 
         elif b == "NT":
             num_int = _resolve(c)
+            if DEBUG:
+                print("[TX]  {} | NT  ch={} note={} vel={}".format(_key_name(_active_key) if _active_key is not None else "?", ch + 1, num_int, val))
             if _usb_midi_iface:
                 _usb_midi_iface.out_channel = ch
                 _usb_midi_iface.send(NoteOn(num_int, val))
@@ -334,6 +346,14 @@ REBOOT_HOLD_SEC = 2.0     # hold the reboot combo for this long → microcontrol
 REBOOT_COMBO    = (0, 2, 3, 5)   # key indices: SW1, SW3, SWA, SWC
 RELOAD_HOLD_SEC = 1.0     # hold the reload combo for this long → reload current page
 RELOAD_COMBO    = (0, 2)  # key indices: SW1, SW3
+
+DEBUG = True   # serial monitor tracing (incoming MIDI, presses, commands, outgoing MIDI)
+
+def _key_name(idx):
+    """Human-readable key name for debug output."""
+    if idx < NUM_PHYSICAL_KEYS:
+        return KEY_NAMES[idx]
+    return "V{}".format(idx)
 
 NUM_PHYSICAL_KEYS = 6     # physical footswitches (0-5)
 NUM_TOTAL_KEYS    = 32    # total addressable keys (0-31); 6 physical + 26 virtual
@@ -967,6 +987,8 @@ async def key_check():
                     kc_i = cfg["keys"][i]
                     next_step = (cycle_pos[i] + 1) % kc_i["cycle"]
                     if kc_i["commands"].get((next_step + 1, "dn")):
+                        if DEBUG:
+                            print("[KEY] {} | dn  | step={}".format(KEY_NAMES[i], next_step + 1))
                         press_key(i)
                         _dn_advanced[i] = True
                     else:
@@ -974,10 +996,17 @@ async def key_check():
                 else:
                     # Rising edge (release confirmed)
                     if is_long[i]:
+                        if DEBUG:
+                            print("[KEY] {} | lup".format(KEY_NAMES[i]))
                         release_key(i, long_press=True)    # lup
                     else:
                         if not _dn_advanced[i]:
+                            _next = (cycle_pos[i] + 1) % max(1, cfg["keys"][i]["cycle"])
+                            if DEBUG:
+                                print("[KEY] {} | dn  | step={} (deferred)".format(KEY_NAMES[i], _next + 1))
                             press_key(i)                   # deferred: advance cycle now
+                        if DEBUG:
+                            print("[KEY] {} | up".format(KEY_NAMES[i]))
                         release_key(i, long_press=False)   # up
 
             # Long press: GPIO physically still held and threshold crossed.
@@ -985,6 +1014,8 @@ async def key_check():
             elif not raw[i] and not debounced[i] and not is_long[i]:
                 if (now - press_ts[i]) >= LONGPRESS_SEC:
                     is_long[i] = True
+                    if DEBUG:
+                        print("[KEY] {} | ldn".format(KEY_NAMES[i]))
                     longpress_key(i)                       # ldn
 
         # Reload combo: hold key 0 + key 2 for RELOAD_HOLD_SEC → reload current page
@@ -1058,10 +1089,7 @@ def _process_capture_cc(channel, control, value):
     global display_dirty
     cap_ch = cfg.get("capture_ch", -1)
     cap_cc = cfg.get("capture_cc", -1)
-    
-    # DEBUG
-    print(f"CC RX: ch={channel} cc={control} val={value} | expect ch={cap_ch} cc={cap_cc}")
-    
+
     if cap_ch < 0 or cap_cc < 0:
         return False
     if channel != cap_ch or control != cap_cc:
@@ -1070,8 +1098,9 @@ def _process_capture_cc(channel, control, value):
     key_idx = value & 0x1F          # lower 5 bits = key number
     action  = (value >> 5) & 0x03   # upper 2 bits = action type
 
-    # DEBUG
-    print(f"  -> KEY {key_idx} action {action}")
+    if DEBUG:
+        _actions = {0: "dn", 1: "ldn", 2: "up", 3: "lup"}
+        print("[RX]  CAP | {} {}".format(_key_name(key_idx), _actions.get(action, "?")))
 
     if key_idx >= NUM_TOTAL_KEYS:
         return False
@@ -1149,6 +1178,15 @@ async def midi_in_task():
             msg = _usb_midi_in.receive()
             if msg is not None:
                 got_msg = True
+                if DEBUG:
+                    if isinstance(msg, ControlChange):
+                        print("[RX]  USB | CC  ch={} cc={} val={}".format(msg.channel + 1, msg.control, msg.value))
+                    elif isinstance(msg, ProgramChange):
+                        print("[RX]  USB | PC  ch={} prog={}".format(msg.channel + 1, msg.patch))
+                    elif isinstance(msg, NoteOn):
+                        print("[RX]  USB | NT  ch={} note={} vel={}".format(msg.channel + 1, msg.note, msg.velocity))
+                    else:
+                        print("[RX]  USB | {}".format(type(msg).__name__))
                 if cfg.get("midi_thru"):
                     if _usb_midi_iface:
                         _usb_midi_iface.send(msg)
@@ -1167,6 +1205,13 @@ async def midi_in_task():
                         status, d1, d2 = parsed
                         msg_type = status & 0xF0
                         channel  = status & 0x0F
+                        if DEBUG:
+                            if msg_type == 0xB0:
+                                print("[RX]  DIN | CC  ch={} cc={} val={}".format(channel + 1, d1, d2))
+                            elif msg_type == 0xC0:
+                                print("[RX]  DIN | PC  ch={} prog={}".format(channel + 1, d1))
+                            elif msg_type == 0x90:
+                                print("[RX]  DIN | NT  ch={} note={} vel={}".format(channel + 1, d1, d2))
                         # MIDI thru: forward DIN-5 input to USB output
                         if cfg.get("midi_thru") and _usb_midi_iface:
                             if msg_type == 0xB0:
