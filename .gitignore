@@ -5,5 +5,3 @@ __pycache__/
 System Volume Information/
 boot_out.txt
 .vscode/
-sync_to_device.py
-sync_from_device.py
