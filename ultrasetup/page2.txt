@@ -18,6 +18,8 @@
 page_name = [ToneX]
 color = [0x000000]
 bgcolor = [0x885522]
+vis_mainlabel_size = [0]
+vis_sublabels = [6]
 
 [key0]
 cycle = [2]
