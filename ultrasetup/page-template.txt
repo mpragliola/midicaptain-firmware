@@ -34,6 +34,24 @@ bgcolor = [0xff0000]
 ; Use [KEY][n][c][lc] to simulate pressing a key on page load (replaces init_key).
 init_commands = [1][CC][32][2] [KEY][0][1][]
 
+; vis_mainlabel_size controls the main status label prominence.
+;   0 = hidden (no main label, sublabels fill the screen)
+;   1 = minuscule (24pt font, minimal space)
+;   2 = tiny (32pt font, small space)
+;   3 = big (48pt font, current default)
+;   4 = bigger (64pt font, same region as 3)
+; Default is 3 if omitted.
+;vis_mainlabel_size = [3]
+
+; vis_sublabels controls how many sublabel cells are shown.
+;   6  = 3x2 grid, physical keys 0-5 only (default)
+;   12 = 3x4 grid, keys 0-11 (virtual keys 6-11 get sublabels too)
+; When using 12, virtual keys 6-11 can define ledN for sublabel
+; background colors (the LEDs won't drive NeoPixels, only sublabel color).
+; Sublabel font and height are auto-calculated based on available space.
+; See docs/VISUALIZATIONS.md for the full layout table.
+;vis_sublabels = [6]
+
 ; group_cycleX, where X is the group number, can be 0 or 1.
 ; If 0 (default), if I press a key in group X and it wasn't already
 ; the last pressed, then the cycle restarts to 1. If 1, the cycle
@@ -150,10 +168,13 @@ key1dn = [PAGE][1][][]
 ; They are triggered via ext_capture_cc (see CAPTURE.md) or
 ; [KEY][n] commands from other keys or init_commands.
 ;
-; Virtual keys support all properties EXCEPT led (ledX, ledXl)
-; since there are no physical LEDs. They DO support:
-; group, longgroup, cycle, longcycle, stompmode, labels, and
-; all key commands (keyXdn, keyXup, keyXldn, keyXlup).
+; Virtual keys support all properties EXCEPT physical LED output.
+; They DO support: group, longgroup, cycle, longcycle, stompmode,
+; labels, and all key commands (keyXdn, keyXup, keyXldn, keyXlup).
+;
+; When vis_sublabels = [12], virtual keys 6-11 get sublabel cells.
+; Define ledN on these keys to set sublabel background colors
+; (the colors won't drive NeoPixels, only the sublabel tile).
 ;
 ; Note: stompmode on virtual keys may not map to a display
 ; sub-panel (the 6 panels correspond to physical keys 0-5).

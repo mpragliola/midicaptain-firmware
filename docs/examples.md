@@ -420,3 +420,69 @@ key1up = [1][PC][3]
 Pressing the external switch (sending CC value 6) selects
 Amp C and turns off keys 0 and 1. Pressing a physical
 button turns off the virtual key's display state.
+
+---
+
+## Visualization modes
+
+Use `vis_mainlabel_size` and `vis_sublabels` in the
+`[page]` section to customize the display layout.
+See `docs/VISUALIZATIONS.md` for the full reference.
+
+### Stomp board (no main label, large sublabels)
+
+Hide the main label to maximize sublabel size:
+
+```ini
+[page]
+page_name = [STOMPS]
+vis_mainlabel_size = [0]
+vis_sublabels = [6]
+
+[key0]
+stompmode = [1]
+cycle = [2]
+led1 = [0x000000][][]
+led2 = [0x00ff00][][]
+label1 = [OFF]
+label2 = [ON]
+key1dn = [1][CC][50][0]
+key2dn = [1][CC][50][127]
+```
+
+Each sublabel cell is 105px tall with 48pt font (3 chars max).
+
+### 12 sublabels with compact main label
+
+Show virtual keys 6-11 alongside physical keys:
+
+```ini
+[page]
+page_name = [FULL]
+vis_mainlabel_size = [2]
+vis_sublabels = [12]
+
+[key0]
+stompmode = [1]
+cycle = [2]
+led1 = [0x000000][][]
+led2 = [0x00ff00][][]
+label1 = [COMP]
+label2 = [COMP]
+key1dn = [1][CC][50][0]
+key2dn = [1][CC][50][127]
+
+[key6]
+stompmode = [1]
+cycle = [2]
+led1 = [0x000000][][]
+led2 = [0x0000ff][][]
+label1 = [DLY]
+label2 = [DLY]
+key1dn = [1][CC][2][0]
+key2dn = [1][CC][2][127]
+```
+
+Sublabel cells are 42px tall with 32pt font (4 chars max).
+Virtual key 6's `led1`/`led2` set sublabel background color
+(no NeoPixels are driven for virtual keys).

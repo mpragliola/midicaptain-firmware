@@ -210,8 +210,18 @@ Each page can configure the **full visual appearance** of the display:
 | **`page_bg_img`** | **BMP wallpaper** from `wallpaper/` folder (overrides `page_bg`) | none |
 | **`led_brightness`** | NeoPixel brightness, **0-100%** | 30 |
 | **`screen_brightness`** | Display backlight brightness, **0-100%** | 50 |
+| **`vis_mainlabel_size`** | Main label size: **0**=hidden, **1**=minuscule, **2**=tiny, **3**=big, **4**=bigger | 3 |
+| **`vis_sublabels`** | Number of sublabel cells: **6** (3x2, keys 0-5) or **12** (3x4, keys 0-11) | 6 |
 
 Text color **auto-inverts** based on background luminance — white text on dark backgrounds, black text on bright backgrounds — so labels are always readable regardless of color scheme.
+
+### Visualization modes
+
+The `vis_mainlabel_size` and `vis_sublabels` parameters control the balance between the main status label and the stomp sub-grid. Reducing the main label size gives more vertical space to sublabels — the sublabel font is automatically chosen to be as large as possible for the available cell height.
+
+With `vis_sublabels = [12]`, virtual keys 6-11 get their own sublabel cells (3x4 grid). Define `ledN` on these keys to set sublabel background colors.
+
+See `docs/VISUALIZATIONS.md` for the full layout table and examples.
 
 ### Key simulation
 
@@ -389,6 +399,7 @@ ultramidi/
     ARCHITECTURE.md      Hardware and firmware architecture
     COMMANDS.md          Command format reference
     CAPTURE.md           External control / virtual key protocol
+    VISUALIZATIONS.md    Display layout modes and examples
     examples.md          Configuration examples for all features
 ```
 
