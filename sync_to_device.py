@@ -12,18 +12,30 @@ import os
 import time
 import shutil
 import hashlib
+import configparser
 from pathlib import Path
 
-SRC = Path("E:/dev/ultramidi")
-DST = Path("G:/")
+_cfg = configparser.ConfigParser()
+_cfg_path = Path(__file__).parent / "sync_config.ini"
+if not _cfg_path.is_file():
+    print(f"Config not found: {_cfg_path}")
+    print("Copy sync_config.ini.example to sync_config.ini and edit it.")
+    sys.exit(1)
+_cfg.read(_cfg_path)
+
+SRC = Path(_cfg["paths"]["src"])
+DST = Path(_cfg["paths"]["dst"])
 
 EXCLUDE_DIRS = {
     "__pycache__", ".claude", ".fseventsd",
     "System Volume Information", ".git", ".Trashes", ".vscode",
+    "docs"
 }
 EXCLUDE_FILES = {
-    ".dropbox.device", "boot_out.txt", ".git", ".gitignore",
+    ".dropbox.device", ".git", ".gitignore",
     "sync_to_device.py", "sync_from_device.py",
+    "sync_config.ini", "sync_config.ini.example",
+    "README.md"
 }
 
 

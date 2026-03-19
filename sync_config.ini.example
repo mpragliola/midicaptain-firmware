@@ -1,0 +1,3 @@
+[paths]
+src = path/of/the/git/repository
+dst = path/of/the/device/filesystem
