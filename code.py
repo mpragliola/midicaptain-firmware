@@ -36,6 +36,24 @@ FONT_STATUS = _bf.load_font("fonts/bahnschrift_48.pcf")   # large centre label
 FONT_PAGE   = terminalio.FONT   # smaller secondary label
 FONT_SUB    = _bf.load_font("fonts/bahnschrift_32.pcf")   # smaller secondary label
 FONT_SUBGRID = _bf.load_font("fonts/bahnschrift_24.pcf")  # stomp sub-grid
+FONT_BIG     = _bf.load_font("fonts/bahnschrift_64.pcf")  # vis_mainlabel_size=4
+
+# Visualization layout tables — indexed by vis_mainlabel_size (0..4).
+_VIS_MAIN_FONT    = [None, FONT_SUBGRID, FONT_SUB, FONT_STATUS, FONT_BIG]
+_VIS_MAIN_LABEL_Y = [0,    30,           30,       43,          35]
+_VIS_SUB_AREA_TOP = [28,   62,           70,       161,         161]
+
+
+def _compute_vis_layout(ml_size, n_subs):
+    """Return (sub_area_top, cell_h, num_rows, sub_font, sub_scale, max_chars)."""
+    num_rows = n_subs // 3
+    sat = _VIS_SUB_AREA_TOP[ml_size]
+    ch = (240 - sat - num_rows) // num_rows
+    if   ch >= 42: sf, sc, mc = FONT_SUB, 1, 4
+    elif ch >= 28: sf, sc, mc = FONT_SUBGRID, 1, 5
+    elif ch >= 16: sf, sc, mc = FONT_PAGE, 2, 6
+    else:          sf, sc, mc = FONT_PAGE, 1, 10
+    return sat, ch, num_rows, sf, sc, mc
 
 
 # =============================================================================
@@ -81,28 +99,28 @@ status_label = _lmod.Label(
 )
 splash.append(status_label)          # index 1
 
-# Sub-grid: up to 6 labeled cells (one per key with stompmode > 0)
-# arranged 3 cols x 2 rows below the main status label.
-# Each cell has a background tile (color from leds_l) and a text label.
+# Sub-grid: up to 12 labeled cells (keys 0-5 physical, 6-11 virtual)
+# arranged 3 cols x 2..4 rows below the main status label.
+# Each cell has a background tile (color from leds) and a text label.
+# When vis_sublabels=6, only slots 0-5 are positioned; 6-11 stay hidden.
 _SUB_CELL_W  = 78
-_SUB_CELL_H  = 38
-_SUB_GRID_X  = [40, 120, 200]   # column centres
-_SUB_GRID_Y  = [180, 218]       # row centres
+_sub_cell_h  = 38                   # mutable — recalculated on page switch
+_SUB_GRID_X  = [40, 120, 200]      # column centres (fixed, 3 columns)
 
-_sub_bar_bitmap = displayio.Bitmap(_SUB_CELL_W, _SUB_CELL_H, 1)
+_sub_bar_bitmap = displayio.Bitmap(_SUB_CELL_W, _sub_cell_h, 1)
 _sub_bar_palettes = []
 _sub_bar_tiles = []
-for _si in range(6):
+for _si in range(12):
     _sp = displayio.Palette(1)
     _sp[0] = 0x000000
     _sp.make_transparent(0)
     _sub_bar_palettes.append(_sp)
     _st = displayio.TileGrid(_sub_bar_bitmap, pixel_shader=_sp, x=999, y=999)
     _sub_bar_tiles.append(_st)
-    splash.append(_st)
+    splash.append(_st)               # indices 2..13
 
 _sub_labels = []
-for _si in range(6):
+for _si in range(12):
     _sl = _lmod.Label(
         FONT_SUBGRID,
         text="",
@@ -112,7 +130,7 @@ for _si in range(6):
         anchored_position=(999, 999),
     )
     _sub_labels.append(_sl)
-    splash.append(_sl)
+    splash.append(_sl)               # indices 14..25
 
 # Page name bar — full-width background behind page_label.
 # Transparent by default; apply_page sets color from cfg["page_bgcolor"].
@@ -121,7 +139,7 @@ _page_bar_palette = displayio.Palette(1)
 _page_bar_palette[0] = 0x000000
 _page_bar_palette.make_transparent(0)
 _page_bar_tile = displayio.TileGrid(_page_bar_bitmap, pixel_shader=_page_bar_palette)
-splash.append(_page_bar_tile)        # index 3
+splash.append(_page_bar_tile)        # index 26
 
 # Page name label — small, anchored to the top edge, drawn on top of bar.
 page_label = _lmod.Label(
@@ -132,7 +150,7 @@ page_label = _lmod.Label(
     anchor_point=(0.5, 0.0),
     anchored_position=(display.width // 2, 0),
 )
-splash.append(page_label)            # index 4
+splash.append(page_label)            # index 27
 
 
 
@@ -467,6 +485,8 @@ def load_page(page_num):
         "capture_ch": -1,          # ext_capture_cc channel (0-based); -1 = disabled
         "capture_cc": -1,          # ext_capture_cc CC number; -1 = disabled
         "midi_thru": False,        # forward incoming MIDI to output
+        "vis_mainlabel_size": 3,   # 0=hidden, 1=minuscule, 2=tiny, 3=big, 4=bigger
+        "vis_sublabels": 6,        # 6 (keys 0-5) or 12 (keys 0-11)
         "keys": [
             {
                 "group": 0, "longgroup": 0, "cycle": 1, "longcycle": 0, "stompmode": 0,
@@ -539,6 +559,11 @@ def load_page(page_num):
                 elif k.startswith("cmd") and k[3:].isdigit():
                     cmd_id = int(k[3:])
                     cfg["cmds"][cmd_id] = parse_commands(v)
+                elif k == "vis_mainlabel_size":
+                    cfg["vis_mainlabel_size"] = max(0, min(4, int(vals[0]))) if vals else 3
+                elif k == "vis_sublabels":
+                    v0 = int(vals[0]) if vals else 6
+                    cfg["vis_sublabels"] = 12 if v0 >= 12 else 6
                 elif k.startswith("group_cycle"):
                     # group_cycleN = [0|1]
                     gid = int(k[len("group_cycle"):])
@@ -665,9 +690,14 @@ _active_key    = None    # index of key whose commands are currently executing (
 # disp_task picks them up and assigns to label objects (where the actual work happens).
 # None means "no change pending".
 _pending_status = None
-_pending_subs       = [None] * 6
-_pending_sub_colors = [None] * 6
+_pending_subs       = [None] * 12
+_pending_sub_colors = [None] * 12
 _pending_page   = None
+
+# Visualization state — cached from cfg on page switch for fast access.
+_vis_sublabels     = 6     # number of active sublabel slots (6 or 12)
+_vis_sub_max_chars = 5     # text truncation limit for sublabels
+_vis_sub_cell_h    = 38    # current sublabel cell height in pixels
 
 
 def _first_non_null_color(led_triple):
@@ -681,6 +711,9 @@ def _first_non_null_color(led_triple):
 def apply_page():
     """Reset all key state, LEDs and display for the current page cfg."""
     global group_active, long_group_active, display_dirty, _pending_status, _pending_page
+    global _vis_sublabels, _vis_sub_max_chars, _vis_sub_cell_h
+    global _sub_bar_bitmap, _sub_cell_h
+    global status_label, _sub_labels
 
     # Apply global brightness settings from config
     pixels.brightness    = max(0.0, min(1.0, cfg["led_brightness"] / 100))
@@ -704,21 +737,63 @@ def apply_page():
     else:
         _page_bar_palette.make_transparent(0)
 
-    # Queue display update — disp_task does the actual label.text assignment
-    # so this function never blocks on text rendering.
+    # Queue display update
     _pending_page   = cfg["page_name"]
 
-    status_label.text = ""          # clear stale text before making visible
-    status_label.anchored_position = (display.width // 2, 43)
-    _pending_status = None          # no pending update needed � already cleared
-    for i in range(6):
-        kc_i = cfg["keys"][i]
-        if kc_i["stompmode"] > 0:
+    # --- Visualization layout ---
+    ml_size = cfg["vis_mainlabel_size"]
+    n_subs  = cfg["vis_sublabels"]
+    sat, ch, num_rows, sub_font, sub_scale, mc = _compute_vis_layout(ml_size, n_subs)
+    _vis_sublabels     = n_subs
+    _vis_sub_max_chars = mc
+    if DEBUG:
+        print("[VIS] ml_size={} n_subs={} sat={} ch={} mc={}".format(ml_size, n_subs, sat, ch, mc))
+
+    # Main label: recreate with the right font, or hide for size=0
+    _pending_status = None
+    main_font = _VIS_MAIN_FONT[ml_size]
+    if main_font is None:
+        status_label = _lmod.Label(FONT_STATUS, text="", color=0xFFFFFF,
+                                   scale=1, line_spacing=0.9,
+                                   anchor_point=(0.5, 0),
+                                   anchored_position=(999, 999))
+    else:
+        status_label = _lmod.Label(main_font, text="", color=0xFFFFFF,
+                                   scale=1, line_spacing=0.9,
+                                   anchor_point=(0.5, 0),
+                                   anchored_position=(display.width // 2,
+                                                      _VIS_MAIN_LABEL_Y[ml_size]))
+    splash[1] = status_label
+
+    # Recreate sublabel tile bitmaps if cell height changed
+    if ch != _vis_sub_cell_h:
+        _vis_sub_cell_h = ch
+        _sub_cell_h     = ch
+        _sub_bar_bitmap = displayio.Bitmap(_SUB_CELL_W, ch, 1)
+        for i in range(12):
+            _nt = displayio.TileGrid(_sub_bar_bitmap, pixel_shader=_sub_bar_palettes[i],
+                                     x=999, y=999)
+            _sub_bar_tiles[i] = _nt
+            splash[2 + i] = _nt
+
+    # Recreate sublabel text labels with the right font
+    for i in range(12):
+        _nl = _lmod.Label(sub_font, text="", color=0xFFFFFF,
+                          scale=sub_scale, line_spacing=0.9,
+                          anchor_point=(0.5, 0.5),
+                          anchored_position=(999, 999))
+        _sub_labels[i] = _nl
+        splash[14 + i] = _nl
+
+    # Position active sublabel slots; hide the rest
+    for i in range(12):
+        if i < n_subs and cfg["keys"][i]["stompmode"] > 0:
             col = i % 3
             row = i // 3
+            ry  = sat + ch // 2 + row * ch
             _sub_bar_tiles[i].x = col * 80 + (80 - _SUB_CELL_W) // 2
-            _sub_bar_tiles[i].y = _SUB_GRID_Y[row] - _SUB_CELL_H // 2
-            _sub_labels[i].anchored_position = (_SUB_GRID_X[col], _SUB_GRID_Y[row])
+            _sub_bar_tiles[i].y = ry - ch // 2
+            _sub_labels[i].anchored_position = (_SUB_GRID_X[col], ry)
             _sub_bar_palettes[i].make_transparent(0)
             _pending_subs[i] = ""
         else:
@@ -759,7 +834,7 @@ def press_key(key_idx):
                     clear_key_leds(i)
                 cycle_pos[i] = -1
                 long_cycle_pos[i] = -1
-                if i < NUM_PHYSICAL_KEYS and cfg["keys"][i]["stompmode"] > 0:
+                if i < _vis_sublabels and cfg["keys"][i]["stompmode"] > 0:
                     _pending_subs[i] = ""
                     _pending_sub_colors[i] = -1
         # If group_cycle is False (0) and a *different* key was last active,
@@ -795,7 +870,7 @@ def press_key(key_idx):
         elif key_idx < NUM_PHYSICAL_KEYS and not labels_d:
             _pending_status = KEY_NAMES[key_idx]
 
-        sm = kc["stompmode"] if key_idx < NUM_PHYSICAL_KEYS else 0
+        sm = kc["stompmode"] if key_idx < _vis_sublabels else 0
         if sm == 1:
             lbl = labels[step] if step < len(labels) else ""
             _pending_subs[key_idx] = lbl
@@ -839,7 +914,7 @@ def longpress_key(key_idx):
                     if prev_step >= 0 and prev_step < len(prev_leds):
                         set_key_leds(prev_active, prev_leds[prev_step])
                 long_cycle_pos[prev_active] = -1
-                if prev_active < NUM_PHYSICAL_KEYS:
+                if prev_active < _vis_sublabels:
                     _pending_subs[prev_active] = ""
                     _pending_sub_colors[prev_active] = -1
             if prev_active != key_idx:
@@ -859,7 +934,7 @@ def longpress_key(key_idx):
             set_key_leds(key_idx, leds_l[lstep])
             pixels.show()
 
-        if key_idx < NUM_PHYSICAL_KEYS:
+        if key_idx < _vis_sublabels:
             labels_l = kc["labels_l"]
             if lstep < len(labels_l):
                 _pending_subs[key_idx] = labels_l[lstep]
@@ -1069,9 +1144,9 @@ async def disp_task():
             if _pending_status is not None:
                 status_label.text = _pending_status.replace(":", "\n")
                 _pending_status   = None
-            for _si in range(6):
+            for _si in range(_vis_sublabels):
                 if _pending_subs[_si] is not None:
-                    _sub_labels[_si].text = _pending_subs[_si][:5]
+                    _sub_labels[_si].text = _pending_subs[_si][:_vis_sub_max_chars]
                     _pending_subs[_si] = None
                 if _pending_sub_colors[_si] is not None:
                     if _pending_sub_colors[_si] == -1:
