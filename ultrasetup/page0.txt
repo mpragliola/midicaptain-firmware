@@ -9,7 +9,7 @@ color = [0x000000]
 bgcolor = [0xff0000]
 init_commands = [KEY][0]
 cmd1 = [1][CC][tx_dly_pwr][0] [1][CC][tx_comp_pwr][0]
-vis_mainlabel_size = [2]
+vis_mainlabel_size = [4]
 
 [key0]
 stompmode = [2]

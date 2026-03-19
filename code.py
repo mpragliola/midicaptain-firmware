@@ -99,10 +99,10 @@ status_label = _lmod.Label(
 )
 splash.append(status_label)          # index 1
 
-# Sub-grid: up to 12 labeled cells (keys 0-5 physical, 6-11 virtual)
+# Sub-grid: labeled cells (keys 0-5 physical, optionally 6-11 virtual)
 # arranged 3 cols x 2..4 rows below the main status label.
 # Each cell has a background tile (color from leds) and a text label.
-# When vis_sublabels=6, only slots 0-5 are positioned; 6-11 stay hidden.
+# All sublabel objects live in _sub_group to avoid bloating splash.
 _SUB_CELL_W  = 78
 _sub_cell_h  = 38                   # mutable — recalculated on page switch
 _SUB_GRID_X  = [40, 120, 200]      # column centres (fixed, 3 columns)
@@ -115,22 +115,24 @@ for _si in range(12):
     _sp[0] = 0x000000
     _sp.make_transparent(0)
     _sub_bar_palettes.append(_sp)
-    _st = displayio.TileGrid(_sub_bar_bitmap, pixel_shader=_sp, x=999, y=999)
-    _sub_bar_tiles.append(_st)
-    splash.append(_st)               # indices 2..13
 
 _sub_labels = []
-for _si in range(12):
+_sub_group = displayio.Group()       # container for active tiles+labels
+
+# Boot with 6 sublabel slots (default layout)
+for _si in range(6):
+    _st = displayio.TileGrid(_sub_bar_bitmap, pixel_shader=_sub_bar_palettes[_si], x=999, y=999)
+    _sub_bar_tiles.append(_st)
+    _sub_group.append(_st)
+for _si in range(6):
     _sl = _lmod.Label(
-        FONT_SUBGRID,
-        text="",
-        color=0xFFFFFF,
-        scale=1,
-        anchor_point=(0.5, 0.5),
-        anchored_position=(999, 999),
+        FONT_SUBGRID, text="", color=0xFFFFFF, scale=1,
+        anchor_point=(0.5, 0.5), anchored_position=(999, 999),
     )
     _sub_labels.append(_sl)
-    splash.append(_sl)               # indices 14..25
+    _sub_group.append(_sl)
+
+splash.append(_sub_group)            # index 2
 
 # Page name bar — full-width background behind page_label.
 # Transparent by default; apply_page sets color from cfg["page_bgcolor"].
@@ -139,7 +141,7 @@ _page_bar_palette = displayio.Palette(1)
 _page_bar_palette[0] = 0x000000
 _page_bar_palette.make_transparent(0)
 _page_bar_tile = displayio.TileGrid(_page_bar_bitmap, pixel_shader=_page_bar_palette)
-splash.append(_page_bar_tile)        # index 26
+splash.append(_page_bar_tile)        # index 3
 
 # Page name label — small, anchored to the top edge, drawn on top of bar.
 page_label = _lmod.Label(
@@ -150,7 +152,7 @@ page_label = _lmod.Label(
     anchor_point=(0.5, 0.0),
     anchored_position=(display.width // 2, 0),
 )
-splash.append(page_label)            # index 27
+splash.append(page_label)            # index 4
 
 
 
@@ -765,43 +767,41 @@ def apply_page():
                                                       _VIS_MAIN_LABEL_Y[ml_size]))
     splash[1] = status_label
 
-    # Recreate sublabel tile bitmaps if cell height changed
+    # Rebuild sublabel bitmap if cell height changed
     if ch != _vis_sub_cell_h:
         _vis_sub_cell_h = ch
         _sub_cell_h     = ch
         _sub_bar_bitmap = displayio.Bitmap(_SUB_CELL_W, ch, 1)
-        for i in range(12):
-            _nt = displayio.TileGrid(_sub_bar_bitmap, pixel_shader=_sub_bar_palettes[i],
-                                     x=999, y=999)
-            _sub_bar_tiles[i] = _nt
-            splash[2 + i] = _nt
 
-    # Recreate sublabel text labels with the right font
-    for i in range(12):
+    # Rebuild _sub_group with exactly n_subs tile+label pairs
+    while len(_sub_group):
+        _sub_group.pop()
+    _sub_bar_tiles.clear()
+    _sub_labels.clear()
+    for i in range(n_subs):
+        _nt = displayio.TileGrid(_sub_bar_bitmap, pixel_shader=_sub_bar_palettes[i],
+                                 x=999, y=999)
+        _sub_bar_tiles.append(_nt)
+        _sub_group.append(_nt)
+    for i in range(n_subs):
         _nl = _lmod.Label(sub_font, text="", color=0xFFFFFF,
                           scale=sub_scale, line_spacing=0.9,
                           anchor_point=(0.5, 0.5),
                           anchored_position=(999, 999))
-        _sub_labels[i] = _nl
-        splash[14 + i] = _nl
+        _sub_labels.append(_nl)
+        _sub_group.append(_nl)
 
-    # Position active sublabel slots; hide the rest
-    for i in range(12):
-        if i < n_subs and cfg["keys"][i]["stompmode"] > 0:
+    # Position active sublabel slots
+    for i in range(n_subs):
+        if cfg["keys"][i]["stompmode"] > 0:
             col = i % 3
             row = i // 3
             ry  = sat + ch // 2 + row * ch
             _sub_bar_tiles[i].x = col * 80 + (80 - _SUB_CELL_W) // 2
             _sub_bar_tiles[i].y = ry - ch // 2
             _sub_labels[i].anchored_position = (_SUB_GRID_X[col], ry)
-            _sub_bar_palettes[i].make_transparent(0)
-            _pending_subs[i] = ""
-        else:
-            _sub_bar_tiles[i].x = 999
-            _sub_bar_tiles[i].y = 999
-            _sub_labels[i].anchored_position = (999, 999)
-            _sub_bar_palettes[i].make_transparent(0)
-            _pending_subs[i] = ""
+        _sub_bar_palettes[i].make_transparent(0)
+        _pending_subs[i] = ""
 
     display_dirty   = True
 
