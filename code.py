@@ -406,7 +406,11 @@ def parse_brackets(s):
     i = 0
     while i < len(s):
         if s[i] == "[":
-            j = s.index("]", i)
+            j = s.find("]", i)
+            if j < 0:
+                if DEBUG:
+                    print("[ERR] parse_brackets: missing ']' in: {}".format(s))
+                break
             result.append(s[i + 1:j])
             i = j + 1
         else:
