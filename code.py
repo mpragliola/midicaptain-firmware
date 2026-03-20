@@ -46,7 +46,7 @@ _VIS_SUB_AREA_TOP = [28,   62,           70,       161,         161]
 
 def _compute_vis_layout(ml_size, n_subs):
     """Return (sub_area_top, cell_h, num_rows, sub_font, sub_scale, max_chars)."""
-    num_rows = n_subs // 3
+    num_rows = max(1, n_subs // 3)
     sat = _VIS_SUB_AREA_TOP[ml_size]
     ch = (240 - sat - num_rows) // num_rows
     if   ch >= 42: sf, sc, mc = FONT_SUB, 1, 4
