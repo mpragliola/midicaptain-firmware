@@ -619,7 +619,12 @@ def load_page(page_num):
                     kc["longgroup"] = int(vals[0]) if vals else 0
 
                 elif k == "cycle":
-                    kc["cycle"] = int(vals[0]) if vals else 1
+                    _cv = int(vals[0]) if vals else 1
+                    if _cv < 1:
+                        if DEBUG:
+                            print("[ERR] key{} cycle={} invalid, using 1".format(idx, _cv))
+                        _cv = 1
+                    kc["cycle"] = _cv
 
                 elif k == "longcycle":
                     kc["longcycle"] = int(vals[0]) if vals else 0
