@@ -1305,9 +1305,16 @@ async def midi_in_task():
                         print("[RX]  USB | NT  ch={} note={} vel={}".format(msg.channel + 1, msg.note, msg.velocity))
                     else:
                         print("[RX]  USB | {}".format(type(msg).__name__))
+                # MIDI thru: forward USB input to DIN-5 output only
+                # (not back to USB — that would create a feedback loop if
+                # the host echoes MIDI)
                 if cfg.get("midi_thru"):
-                    if _usb_midi_iface:
-                        _usb_midi_iface.send(msg)
+                    if isinstance(msg, ControlChange):
+                        _uart.write(bytes([0xB0 | msg.channel, msg.control, msg.value]))
+                    elif isinstance(msg, ProgramChange):
+                        _uart.write(bytes([0xC0 | msg.channel, msg.patch]))
+                    elif isinstance(msg, NoteOn):
+                        _uart.write(bytes([0x90 | msg.channel, msg.note, msg.velocity]))
                 if isinstance(msg, ControlChange):
                     _process_capture_cc(msg.channel, msg.control, msg.value)
 
