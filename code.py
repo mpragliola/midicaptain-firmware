@@ -249,6 +249,9 @@ def _resolve(s):
     return int(s)
 
 
+_exec_depth = 0
+_EXEC_MAX_DEPTH = 8
+
 def exec_commands(cmds):
     """Execute a list of (a, b, c, d) command tuples parsed from config.
 
@@ -261,6 +264,21 @@ def exec_commands(cmds):
       [ch][NT][note][vel]  — Note On
     Null/ignored slots are "" or "-".
     """
+    global _exec_depth
+    _exec_depth += 1
+    if _exec_depth > _EXEC_MAX_DEPTH:
+        if DEBUG:
+            print("[ERR] exec_commands recursion depth {} exceeded max {}".format(_exec_depth, _EXEC_MAX_DEPTH))
+        _exec_depth -= 1
+        return
+    try:
+        _exec_commands_inner(cmds)
+    finally:
+        _exec_depth -= 1
+
+
+def _exec_commands_inner(cmds):
+    """Inner implementation of exec_commands (called after depth check)."""
     for cmd in cmds:
         a, b, c, d = cmd
 
