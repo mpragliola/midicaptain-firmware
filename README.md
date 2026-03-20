@@ -2,35 +2,111 @@
 
 Custom firmware for the **MidiCaptain Mini 6** MIDI foot controller. Replaces the stock firmware with a fully configurable, text-file-driven system for controlling guitar processors, synthesizers, DAWs, and other MIDI gear.
 
-Built on **CircuitPython** for the **RP2040** microcontroller. No companion app required — all configuration is done by editing plain text files.
+## Why this firmware
 
-## Hardware
+The Mini 6 offers easy and open access to its internals, and can become _de facto_ a
+prototyping laboratory for MIDI controllers. I decided to write a custom firmware from
+scratch both for fun, and as a way to implement functionalities that were absent in
+the original firmware.
 
-| Component | Detail |
-|-----------|--------|
-| Controller | MidiCaptain Mini 6 |
-| MCU | RP2040 (dual Cortex-M0+, 264 KB RAM, 2 MB flash) |
-| Runtime | Adafruit CircuitPython 7.3.1 |
-| Display | 240x240 ST7789 TFT (SPI) |
-| LEDs | 18 WS2812B NeoPixels (3 per footswitch) |
-| Switches | 6 momentary footswitches |
-| MIDI Out | USB-MIDI + DIN-5 UART (31250 baud) |
-| MIDI In | USB-MIDI (all 16 channels) |
+The result is **a much more flexible system** (though I can't
+guarantee about its stability).
+
+* [Hardware specs](docs/SPECS.md)
+* [How to configure](docs/CONFIGURATION.md)
+* [Pages](docs/PAGES.md)
+
+### Hardware
+
+These are the specs I've gathered (no guarantee of their correctness): MCU RP2040 (dual Cortex-M0+, 264 KB RAM, 2 MB flash), running Adafruit CircuitPython 7.3.1**. Features a 240x240 ST7789 TFT (SPI) display, 6 switches, 18 WS2812B NeoPixels (3 per footswitch) LEDs,
+MIDI over USB-MIDI + DIN-5 UART.
 
 ## Features
 
-### Multi-page configuration
+* freely assignable LEDs
+* possibility to integrate the functionalities of on-board switches withswitches from
+  external controllers, de facto allowing to extend the controllers
+* different layout modes 
+* 2 parallel cycles
+* button grouping
+* macros
+* free number of pages
 
-The device supports **multiple pages** of button assignments. Each page is a standalone text file (`ultrasetup/page0.txt`, `page1.txt`, etc.) with its own key mappings, groups, macros, and display settings. Switch between pages at any time with a footswitch press.
 
-This allows defining different sets of functionalities for
-different devices, bands, songs, ... or simply to extend the
-available options.
 
-Page navigation is **fully customizable** and can be assigned
-like any other normal command.
 
-### Cycle steps
+
+* pages can be useful to prepare **specialized configurations**; useful
+  if you want to have different configurations for different songs, 
+  setlists, bands or target devices
+* use them also when 6 footswitches are a limit: you can distribute 
+  functionality among pages and widen your control possibilties
+* the free assingments allows us to change navigation mode at each page.
+  Most of the times it's advisable to **assign page navigation to  the same buttons and actions across pages for consistency**.
+  But if you are on page 0, for example, it makes no sense to have a 
+  "previous page" assignment (unless you want to cycle to the last), 
+  so you could free a slot and make the button perform other actions.
+
+## Aliases
+
+The file `/ultrasetup/aliases.txt` can be edited to modify the **aliases**.
+An alias is a sequence of characters that will be substituted in the page 
+configuration with its assigned value.
+
+### Defining an alias
+
+Add, delete or modify  in the format:
+
+```
+alias_name = <value>;
+```
+
+### Use cases for aliases
+
+There are mainly two use cases for aliases.
+
+#### 1. Use aliases as variables
+
+Let's say you want to control a device that is receiving on MIDI channel 4. You
+could model your commands by specifying the channel directly, e.g. `[4][PC][2]`;
+but what happens if you defined 50 commands and decide to change the MIDI 
+channel?
+
+Instead you can assign an alias to channel 4 (e.g. `hxstomp_chan = 4;`) and use
+it in command declarations: `[hxstomp_chan][PC][2]`. If one day you decide to change
+the receiving channel on the target device, you will have to change the configuration
+only in one place.
+
+#### 2. Use aliases as mappings
+
+Most of the times your target device(s) will feature a **MIDI implementation chart**,
+with the specific commands (usually CC#) and values needed to control functionality.
+
+Aliases can represent those mappings, so that declaring commands is easier to remember
+and to understand. 
+
+For example, if I have a Line6 HX Stomp, the mapping tells mne that FootSwitch 1 is
+mapped to CC#49. I can define an alias:;
+
+```
+line6hxstomp_fs1 = 49   ; Footswitch 1  (0-127)
+```
+
+and use it in command declarations:
+
+```
+init_commands = [1][CC][line6hxstomp_fs1][127]
+```
+
+### Caveats
+
+The substitutions are "stupid" and purely based on text matching and substitution,
+so **make sure your alias name is alphanumeric and unique enough**. 
+This will avoid ambiguities with existing commands (e.g. don't use `PAGE` as alias)
+and among similar functions on different of your target devices.
+A good strategy is to use prefixes, like `line6hxstomp_*` above.
+
+## Cycle steps
 
 Each key can **cycle through up to 9 states** on successive presses. Every cycle step carries its own:
 

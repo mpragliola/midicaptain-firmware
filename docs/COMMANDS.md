@@ -102,3 +102,23 @@ commands over and over.
 ```
 [CMD][x]
 ```
+
+## Use case
+
+The typical use case is **when you have to configure
+over and over the same set of operations** on 
+different buttons and/or pages.
+
+For example, you might want at each page to reset
+certain parameters with CCs; you can define a 
+global command:
+
+```
+cmd1 = [1][CC][30][0] [1][CC][31][0] [1][CC][32][0] 
+```
+
+and then for each page:
+
+```
+init_commands: [CMD][1]
+```

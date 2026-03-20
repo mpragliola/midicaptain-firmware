@@ -1,27 +1,33 @@
 # Capture
 
-The capture function allows the device to be controlled
-externally. The best way to do it is with virtual keys, where you
+The **capture function** allows the device **to be controlled
+externally**. The best way to do it is with **virtual keys**, where you
 can "extend" the device, integrating external switches
 into the device's functionalities.
 
-You set up capture in the configuration, by assigning an
-incoming MIDI channel and a CC# to listen to:
+You set up capture in the **global configuration**, by assigning an incoming MIDI channel and a CC# to listen to:
 
 ```
 ext_capture_cc = [1][30]
 ```
 
-The device will monitor those incoming CC#s.
+The device will now capture any CC#30 and perform
+actions depending on the value.
 
 ## Controlling Keys and Virtual keys
 
-The firmware addresses always 32 keys (0x00-0x1F). The first
-slots are reserved to the physical keys (in case of the MIDI
-Captain which has 6 keys, from 0 to 5).
-Subsequent keys are treated as virtual. They can be referenced
-to in configurations, commands and macros but will clearly have
-no possibility for LED feedback (but they will on the display).
+The firmware **always addresses** 32 keys (0-15, hexadecimal 0x00-0x1F), no matter how many physical buttons are there on the device.
+
+The first slots are reserved to the physical keys (in case of the MIDI Captain which has 6 keys, from 0 to 5).
+
+Subsequent keys are treated as virtual. 
+
+They can be **referenced to** in configurations, commands and macros as a shortcut.
+
+> Clearly, virtual buttons have no possibility of
+> a LED feedback.
+
+
 
 ### Using key events correctly
 
