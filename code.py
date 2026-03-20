@@ -1287,14 +1287,15 @@ async def midi_in_task():
       0x40-0x5F (64-95)  = key up (up)
       0x60-0x7F (96-127) = long press up (lup)
     """
+    _MIDI_YIELD_EVERY = 4   # yield to other tasks after this many messages
     while True:
-        got_msg = False
+        msg_count = 0
 
         # --- USB-MIDI input ---
         if _usb_midi_in is not None:
             msg = _usb_midi_in.receive()
             if msg is not None:
-                got_msg = True
+                msg_count += 1
                 if DEBUG:
                     if isinstance(msg, ControlChange):
                         print("[RX]  USB | CC  ch={} cc={} val={}".format(msg.channel + 1, msg.control, msg.value))
@@ -1313,12 +1314,12 @@ async def midi_in_task():
         # --- DIN-5 UART MIDI input ---
         uart_avail = _uart.in_waiting
         if uart_avail:
-            got_msg = True
             raw = _uart.read(uart_avail)
             if raw:
                 for b in raw:
                     parsed = _uart_parse_byte(b)
                     if parsed is not None:
+                        msg_count += 1
                         status, d1, d2 = parsed
                         msg_type = status & 0xF0
                         channel  = status & 0x0F
@@ -1341,7 +1342,7 @@ async def midi_in_task():
                         if msg_type == 0xB0:
                             _process_capture_cc(channel, d1, d2)
 
-        if not got_msg:
+        if msg_count >= _MIDI_YIELD_EVERY or msg_count == 0:
             await asyncio.sleep(0)
 
 
