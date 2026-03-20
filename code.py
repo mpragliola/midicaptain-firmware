@@ -280,99 +280,108 @@ def exec_commands(cmds):
 def _exec_commands_inner(cmds):
     """Inner implementation of exec_commands (called after depth check)."""
     for cmd in cmds:
-        a, b, c, d = cmd
-
-        # ---- Macro (reusable command defined in [page] as cmdN) ----------
-        if a == "CMD":
-            cmd_id = int(b) if (b and b != "-") else -1
+        try:
+            _exec_one_command(cmd)
+        except (ValueError, TypeError) as e:
             if DEBUG:
-                print("[CMD] {} | macro {}".format(_key_name(_active_key) if _active_key is not None else "?", cmd_id))
-            if cmd_id in cfg.get("cmds", {}):
-                exec_commands(cfg["cmds"][cmd_id])
-            elif cmd_id in cfg.get("global_cmds", {}):
-                exec_commands(cfg["global_cmds"][cmd_id])
-            continue
+                print("[ERR] bad command {}: {}".format(cmd, e))
 
-        # ---- Page switch ------------------------------------------------
-        if a == "PAGE":
-            if b == "inc":
-                page_num = page_cur + 1
-            elif b == "dec":
-                page_num = page_cur - 1
-            else:
-                page_num = int(b) if (b and b != "-") else 0
-            if DEBUG:
-                print("[CMD] {} | PAGE {}".format(_key_name(_active_key) if _active_key is not None else "?", page_num))
-            switch_page(page_num)
-            continue
 
-        # ---- Key simulation ---------------------------------------------
-        if a == "KEY":
-            key_num = int(b) if (b and b != "-") else -1
-            if DEBUG:
-                print("[CMD] {} | KEY {} step={} lstep={}".format(_key_name(_active_key) if _active_key is not None else "?", _key_name(key_num), c, d))
-            if 0 <= key_num < NUM_TOTAL_KEYS and key_num != _active_key:
-                kc_key = cfg["keys"][key_num]
-                # Optional cycle step c (1-based in config)
-                if c and c != "-":
-                    target_step = int(c) - 1
-                    # Set cycle_pos so press_key advances to target_step
-                    cycle_pos[key_num] = (target_step - 1) % max(1, kc_key["cycle"])
-                    g = kc_key["group"]
-                    if g > 0:
-                        group_active[g] = key_num
-                press_key(key_num)
-                release_key(key_num, long_press=False)
-                # Optional long cycle step lc (1-based in config)
-                if d and d != "-":
-                    target_lstep = int(d) - 1
-                    lc_count = kc_key["longcycle"]
-                    if lc_count > 0:
-                        long_cycle_pos[key_num] = (target_lstep - 1) % lc_count
-                        lg = kc_key["longgroup"]
-                        if lg > 0:
-                            long_group_active[lg] = key_num
-                        longpress_key(key_num)
-            continue
+def _exec_one_command(cmd):
+    """Execute a single (a, b, c, d) command tuple. May raise ValueError."""
+    a, b, c, d = cmd
 
-        # ---- MIDI -------------------------------------------------------
-        ch  = (int(a) - 1) & 0x0F          # config is 1-based; hardware is 0-based
-        val = _resolve(d)
+    # ---- Macro (reusable command defined in [page] as cmdN) ----------
+    if a == "CMD":
+        cmd_id = int(b) if (b and b != "-") else -1
+        if DEBUG:
+            print("[CMD] {} | macro {}".format(_key_name(_active_key) if _active_key is not None else "?", cmd_id))
+        if cmd_id in cfg.get("cmds", {}):
+            exec_commands(cfg["cmds"][cmd_id])
+        elif cmd_id in cfg.get("global_cmds", {}):
+            exec_commands(cfg["global_cmds"][cmd_id])
+        return
 
-        if b == "PC":
-            if c == "inc":
-                step = int(d) if (d and d != "-") else 1
-                num_int = min(127, _pc_state.get(ch, 0) + step)
-            elif c == "dec":
-                step = int(d) if (d and d != "-") else 1
-                num_int = max(0, _pc_state.get(ch, 0) - step)
-            else:
-                num_int = _resolve(c)
-            _pc_state[ch] = num_int
-            if DEBUG:
-                print("[TX]  {} | PC  ch={} prog={}".format(_key_name(_active_key) if _active_key is not None else "?", ch + 1, num_int))
-            if _usb_midi_iface:
-                _usb_midi_iface.out_channel = ch
-                _usb_midi_iface.send(ProgramChange(num_int))
-            _uart.write(bytes([0xC0 | ch, num_int]))
+    # ---- Page switch ------------------------------------------------
+    if a == "PAGE":
+        if b == "inc":
+            page_num = page_cur + 1
+        elif b == "dec":
+            page_num = page_cur - 1
+        else:
+            page_num = int(b) if (b and b != "-") else 0
+        if DEBUG:
+            print("[CMD] {} | PAGE {}".format(_key_name(_active_key) if _active_key is not None else "?", page_num))
+        switch_page(page_num)
+        return
 
-        elif b == "CC":
+    # ---- Key simulation ---------------------------------------------
+    if a == "KEY":
+        key_num = int(b) if (b and b != "-") else -1
+        if DEBUG:
+            print("[CMD] {} | KEY {} step={} lstep={}".format(_key_name(_active_key) if _active_key is not None else "?", _key_name(key_num), c, d))
+        if 0 <= key_num < NUM_TOTAL_KEYS and key_num != _active_key:
+            kc_key = cfg["keys"][key_num]
+            # Optional cycle step c (1-based in config)
+            if c and c != "-":
+                target_step = int(c) - 1
+                # Set cycle_pos so press_key advances to target_step
+                cycle_pos[key_num] = (target_step - 1) % max(1, kc_key["cycle"])
+                g = kc_key["group"]
+                if g > 0:
+                    group_active[g] = key_num
+            press_key(key_num)
+            release_key(key_num, long_press=False)
+            # Optional long cycle step lc (1-based in config)
+            if d and d != "-":
+                target_lstep = int(d) - 1
+                lc_count = kc_key["longcycle"]
+                if lc_count > 0:
+                    long_cycle_pos[key_num] = (target_lstep - 1) % lc_count
+                    lg = kc_key["longgroup"]
+                    if lg > 0:
+                        long_group_active[lg] = key_num
+                    longpress_key(key_num)
+        return
+
+    # ---- MIDI -------------------------------------------------------
+    ch  = (int(a) - 1) & 0x0F          # config is 1-based; hardware is 0-based
+    val = _resolve(d)
+
+    if b == "PC":
+        if c == "inc":
+            step = int(d) if (d and d != "-") else 1
+            num_int = min(127, _pc_state.get(ch, 0) + step)
+        elif c == "dec":
+            step = int(d) if (d and d != "-") else 1
+            num_int = max(0, _pc_state.get(ch, 0) - step)
+        else:
             num_int = _resolve(c)
-            if DEBUG:
-                print("[TX]  {} | CC  ch={} cc={} val={}".format(_key_name(_active_key) if _active_key is not None else "?", ch + 1, num_int, val))
-            if _usb_midi_iface:
-                _usb_midi_iface.out_channel = ch
-                _usb_midi_iface.send(ControlChange(num_int, val))
-            _uart.write(bytes([0xB0 | ch, num_int, val]))
+        _pc_state[ch] = num_int
+        if DEBUG:
+            print("[TX]  {} | PC  ch={} prog={}".format(_key_name(_active_key) if _active_key is not None else "?", ch + 1, num_int))
+        if _usb_midi_iface:
+            _usb_midi_iface.out_channel = ch
+            _usb_midi_iface.send(ProgramChange(num_int))
+        _uart.write(bytes([0xC0 | ch, num_int]))
 
-        elif b == "NT":
-            num_int = _resolve(c)
-            if DEBUG:
-                print("[TX]  {} | NT  ch={} note={} vel={}".format(_key_name(_active_key) if _active_key is not None else "?", ch + 1, num_int, val))
-            if _usb_midi_iface:
-                _usb_midi_iface.out_channel = ch
-                _usb_midi_iface.send(NoteOn(num_int, val))
-            _uart.write(bytes([0x90 | ch, num_int, val]))
+    elif b == "CC":
+        num_int = _resolve(c)
+        if DEBUG:
+            print("[TX]  {} | CC  ch={} cc={} val={}".format(_key_name(_active_key) if _active_key is not None else "?", ch + 1, num_int, val))
+        if _usb_midi_iface:
+            _usb_midi_iface.out_channel = ch
+            _usb_midi_iface.send(ControlChange(num_int, val))
+        _uart.write(bytes([0xB0 | ch, num_int, val]))
+
+    elif b == "NT":
+        num_int = _resolve(c)
+        if DEBUG:
+            print("[TX]  {} | NT  ch={} note={} vel={}".format(_key_name(_active_key) if _active_key is not None else "?", ch + 1, num_int, val))
+        if _usb_midi_iface:
+            _usb_midi_iface.out_channel = ch
+            _usb_midi_iface.send(NoteOn(num_int, val))
+        _uart.write(bytes([0x90 | ch, num_int, val]))
 
 
 # =============================================================================
