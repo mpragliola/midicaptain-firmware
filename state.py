@@ -15,8 +15,8 @@ REBOOT_COMBO    = (0, 2, 3, 5)
 RELOAD_HOLD_SEC = 1.0
 RELOAD_COMBO    = (0, 2)
 
-# Recursion guard
-_EXEC_MAX_DEPTH = 8
+# Recursion guard — RP2040 pystack exhausts well before depth 8; keep this low
+_EXEC_MAX_DEPTH = 2
 _exec_depth = 0
 
 # Runtime state
