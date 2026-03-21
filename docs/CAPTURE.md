@@ -5,7 +5,9 @@ externally**. The best way to do it is with **virtual keys**, where you
 can "extend" the device, integrating external switches
 into the device's functionalities.
 
-You set up capture in the **global configuration**, by assigning an incoming MIDI channel and a CC# to listen to:
+## Setting up  capture
+
+You set up capture in the **global configuration**, by assigning an incoming MIDI channel and a CC# to listen to.
 
 ```
 ext_capture_cc = [1][30]
@@ -14,7 +16,13 @@ ext_capture_cc = [1][30]
 The device will now capture any CC#30 and perform
 actions depending on the value.
 
+> The captured CC# are echoed in any case
+> via MIDI Thru.-
+
 ## Controlling Keys and Virtual keys
+
+Once capture CC# is specified, the device
+will listen for incoming values.
 
 The firmware **always addresses** 32 keys (0-15, hexadecimal 0x00-0x1F), no matter how many physical buttons are there on the device.
 
@@ -27,16 +35,14 @@ They can be **referenced to** in configurations, commands and macros as a shortc
 > Clearly, virtual buttons have no possibility of
 > a LED feedback.
 
-
-
 ### Using key events correctly
 
-**Important:** The device has no knowledge of the actual 
-state of an external switch and can't distinguish between a
-click, a long click, key up ... it just handles the incoming
+**Important: The device has no knowledge of the actual 
+state of an external switch** and therefore can't distinguish between a
+click, a long click, key up ... It just handles the incoming
 MIDI from it. 
 
-In order to integrate functionalities like up, down, long, ... 
+In order to integrate functionalities like up, down, long press, etc. 
 correctly, the external device must be programmed to fire the
 appropriate CC# values.
 
