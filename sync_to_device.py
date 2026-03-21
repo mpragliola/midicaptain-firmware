@@ -81,6 +81,13 @@ def get_src_files():
     return files
 
 
+def free_space():
+    """Return free space on DST as a human-readable string."""
+    usage = shutil.disk_usage(DST)
+    kb = usage.free / 1024
+    return f"{kb:.1f} KB free"
+
+
 def sync(verbose=True):
     """One-shot sync from E: to G:. Returns number of files changed."""
     changed = 0
@@ -116,12 +123,12 @@ def watch(interval=2):
             n = sync()
             if n:
                 if initial:
-                    print(f"Initial sync: {n} file(s) deployed.\n")
+                    print(f"Initial sync: {n} file(s) deployed. {free_space()}\n")
                 else:
                     ts = time.strftime("%H:%M:%S")
-                    print(f"[{ts}] Deployed {n} file(s) to device")
+                    print(f"[{ts}] Deployed {n} file(s) to device. {free_space()}")
             elif initial:
-                print("Already in sync.\n")
+                print(f"Already in sync. {free_space()}\n")
 
             initial = False
             time.sleep(interval)
@@ -141,7 +148,7 @@ if __name__ == "__main__":
             sys.exit(1)
         try:
             n = sync()
-            print(f"Done. {n} file(s) deployed.")
+            print(f"Done. {n} file(s) deployed. {free_space()}")
         except OSError:
             print("Device disconnected during sync.")
             sys.exit(1)
