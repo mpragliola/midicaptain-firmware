@@ -71,20 +71,6 @@ def clear_key_leds(key_idx):
 
 def exec_commands(cmds):
     """Execute a list of (a, b, c, d) command tuples parsed from config."""
-    S._exec_depth += 1
-    if S._exec_depth > S._EXEC_MAX_DEPTH:
-        if S.DEBUG:
-            print("[ERR] exec_commands recursion depth {} exceeded max {}".format(S._exec_depth, S._EXEC_MAX_DEPTH))
-        S._exec_depth -= 1
-        return
-    try:
-        _exec_commands_inner(cmds)
-    finally:
-        S._exec_depth -= 1
-
-
-def _exec_commands_inner(cmds):
-    """Inner implementation of exec_commands (called after depth check)."""
     for cmd in cmds:
         try:
             _exec_one_command(cmd)
@@ -273,13 +259,51 @@ def apply_page():
     S.display_dirty = True
 
 
+def _show_page_errors(errs, page_num):
+    """Override display to show page validation errors after apply_page()."""
+    # Red page bar, white text
+    S._page_bar_palette[0] = 0xCC2200
+    S._page_bar_palette.make_opaque(0)
+    S.page_label.color = 0xFFFFFF
+    S._pending_page = "p{}:ERR".format(page_num)
+
+    # First error in the main status label (colon -> newline via disp_task)
+    # If vis_mainlabel_size=0 the label is hidden; reposition it to size-3 slot
+    if S.cfg["vis_mainlabel_size"] == 0:
+        S.status_label.anchored_position = (
+            S.display.width // 2,
+            S._VIS_MAIN_LABEL_Y[3],
+        )
+    S._pending_status = errs[0]
+
+    # Show up to 6 errors in sub-cells, force-positioned regardless of stompmode
+    sat = S._VIS_SUB_AREA_TOP[S.cfg["vis_mainlabel_size"]]
+    ch  = S._sub_cell_h
+    n   = min(6, len(errs), len(S._sub_labels))
+    for i in range(n):
+        col = i % 3
+        row = i // 3
+        ry  = sat + ch // 2 + row * ch
+        S._sub_bar_tiles[i].x = col * 80 + (80 - S._SUB_CELL_W) // 2
+        S._sub_bar_tiles[i].y = ry - ch // 2
+        S._sub_labels[i].anchored_position = (S._SUB_GRID_X[col], ry)
+        S._sub_bar_palettes[i][0] = 0xCC2200
+        S._sub_bar_palettes[i].make_opaque(0)
+        S._pending_subs[i] = errs[i]
+
+    S.display_dirty = True
+
+
 def switch_page(page_num):
     """Load a new page config, reset state, and run init commands."""
     S._page_switched = False
     S.page_cur = page_num
     S.cfg      = load_page(page_num)
     apply_page()
-    exec_commands(S.cfg["init_commands"])
+    if S.cfg["page_errors"]:
+        _show_page_errors(S.cfg["page_errors"], page_num)
+    else:
+        exec_commands(S.cfg["init_commands"])
     S._page_switched = True
 
 

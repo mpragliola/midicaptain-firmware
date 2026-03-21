@@ -2,6 +2,7 @@
 
 import os
 import state as S
+from validate import validate_cfg
 
 # =============================================================================
 # ALIASES — loaded once from ultrasetup/aliases.txt
@@ -131,6 +132,7 @@ def load_page(page_num):
         "midi_thru": False,
         "vis_mainlabel_size": 3,
         "vis_sublabels": 6,
+        "page_errors": [],
         "keys": [
             {
                 "group": 0, "longgroup": 0, "cycle": 1, "longcycle": 0, "stompmode": 0,
@@ -274,4 +276,6 @@ def load_page(page_num):
                                 step = int(step_str)
                                 kc["commands"][(step, action)] = parse_commands(v)
                             break
+
+    cfg["page_errors"] = validate_cfg(cfg, page_num)
     return cfg
