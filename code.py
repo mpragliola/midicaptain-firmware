@@ -334,6 +334,15 @@ async def key_check():
             else:
                 combo_start = None
 
+        # --- Deferred page switch (runs at shallow stack depth) ---
+        if S._pending_page_switch is not None:
+            _pps_n = 0
+            while S._pending_page_switch is not None and _pps_n < 4:
+                _pps = S._pending_page_switch
+                S._pending_page_switch = None
+                switch_page(_pps)
+                _pps_n += 1
+
         await asyncio.sleep(0)
 
 

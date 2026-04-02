@@ -73,6 +73,22 @@ def clear_key_leds(key_idx):
 def exec_commands(cmds):
     """Execute a list of (a, b, c, d) command tuples parsed from config."""
     for cmd in cmds:
+        if cmd[0] == "CMD":
+            _b = cmd[1]
+            cmd_id = int(_b) if (_b and _b != "-") else -1
+            if S.DEBUG:
+                print("[CMD] {} | macro {}".format(_dbg_key(), cmd_id))
+            macro = S.cfg.get("cmds", {}).get(cmd_id)
+            if macro is None:
+                macro = S.cfg.get("global_cmds", {}).get(cmd_id)
+            if macro:
+                for mcmd in macro:
+                    try:
+                        _exec_one_command(mcmd)
+                    except (ValueError, TypeError) as e:
+                        if S.DEBUG:
+                            print("[ERR] bad command {}: {}".format(mcmd, e))
+            continue
         try:
             _exec_one_command(cmd)
         except (ValueError, TypeError) as e:
@@ -84,17 +100,6 @@ def _exec_one_command(cmd):
     """Execute a single (a, b, c, d) command tuple. May raise ValueError."""
     a, b, c, d = cmd
 
-    # ---- Macro (reusable command defined in [page] as cmdN) ----------
-    if a == "CMD":
-        cmd_id = int(b) if (b and b != "-") else -1
-        if S.DEBUG:
-            print("[CMD] {} | macro {}".format(_dbg_key(), cmd_id))
-        if cmd_id in S.cfg.get("cmds", {}):
-            exec_commands(S.cfg["cmds"][cmd_id])
-        elif cmd_id in S.cfg.get("global_cmds", {}):
-            exec_commands(S.cfg["global_cmds"][cmd_id])
-        return
-
     # ---- Page switch ------------------------------------------------
     if a == "PAGE":
         if b == "inc":
@@ -104,8 +109,9 @@ def _exec_one_command(cmd):
         else:
             page_num = int(b) if (b and b != "-") else 0
         if S.DEBUG:
-            print("[CMD] {} | PAGE {}".format(_dbg_key(), page_num))
-        switch_page(page_num)
+            print("[CMD] {} | PAGE {} (deferred)".format(_dbg_key(), page_num))
+        S._pending_page_switch = page_num
+        S._page_switched = True
         return
 
     # ---- Key simulation ---------------------------------------------
