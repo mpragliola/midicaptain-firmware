@@ -3,9 +3,8 @@
 # Call validate_cfg(cfg, page_num) after load_page() to get a list of
 # error strings. Empty list means the config is valid.
 #
-# Error strings use "context:detail" format — the colon is intentional:
-# engine.py's disp_task replaces ":" with newline in the status label,
-# producing a clean two-line display. Sub-labels show the truncated string.
+# Error strings use compact "context:detail" format. They are shown
+# in plain terminal font on the error screen (see engine._show_page_errors).
 
 _MAX_ERRORS = 8  # stop collecting after this many
 
@@ -197,16 +196,12 @@ def validate_cfg(cfg, page_num):
         nl = len(kc["leds"])
         if nl > cy:
             errs.append("{}:{}leds>cy{}".format(pfx, nl, cy))
-        if kc["leds_l"] and lcy == 0:
-            errs.append("{}:ledl,lcy=0".format(pfx))
-        elif lcy > 0 and len(kc["leds_l"]) > lcy:
+        if lcy > 0 and len(kc["leds_l"]) > lcy:
             errs.append("{}:{}ledl>lcy{}".format(pfx, len(kc["leds_l"]), lcy))
 
         # Label count vs cycle
         if len(kc["labels"]) > cy:
             errs.append("{}:{}lbl>cy{}".format(pfx, len(kc["labels"]), cy))
-        if kc["labels_l"] and lcy == 0:
-            errs.append("{}:lbll,lcy=0".format(pfx))
 
         # Command step vs cycle
         for (step, act), cmds in kc["commands"].items():

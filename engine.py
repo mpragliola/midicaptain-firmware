@@ -261,36 +261,28 @@ def apply_page():
 
 
 def _show_page_errors(errs, page_num):
-    """Override display to show page validation errors after apply_page()."""
+    """Override display to show page validation errors in plain terminal font."""
     # Red page bar, white text
     S._page_bar_palette[0] = 0xCC2200
     S._page_bar_palette.make_opaque(0)
     S.page_label.color = 0xFFFFFF
-    S._pending_page = "p{}:ERR".format(page_num)
+    S._pending_page = "P{}:ERR".format(page_num)
 
-    # First error in the main status label (colon -> newline via disp_task)
-    # If vis_mainlabel_size=0 the label is hidden; reposition it to size-3 slot
-    if S.cfg["vis_mainlabel_size"] == 0:
-        S.status_label.anchored_position = (
-            S.display.width // 2,
-            S._VIS_MAIN_LABEL_Y[3],
-        )
-    S._pending_status = errs[0]
+    # Hide sublabels — errors don't use the performance grid
+    for i in range(len(S._sub_bar_palettes)):
+        S._sub_bar_palettes[i].make_transparent(0)
+    for i in range(len(S._sub_labels)):
+        S._sub_labels[i].text = ""
 
-    # Show up to 6 errors in sub-cells, force-positioned regardless of stompmode
-    sat = S._VIS_SUB_AREA_TOP[S.cfg["vis_mainlabel_size"]]
-    ch  = S._sub_cell_h
-    n   = min(6, len(errs), len(S._sub_labels))
-    for i in range(n):
-        col = i % 3
-        row = i // 3
-        ry  = sat + ch // 2 + row * ch
-        S._sub_bar_tiles[i].x = col * 80 + (80 - S._SUB_CELL_W) // 2
-        S._sub_bar_tiles[i].y = ry - ch // 2
-        S._sub_labels[i].anchored_position = (S._SUB_GRID_X[col], ry)
-        S._sub_bar_palettes[i][0] = 0xCC2200
-        S._sub_bar_palettes[i].make_opaque(0)
-        S._pending_subs[i] = errs[i]
+    # Show all errors as plain terminal-font text below the page bar
+    txt = "\n".join(errs[:8])
+    S.status_label = S._lmod.Label(
+        terminalio.FONT, text=txt, color=0xFFFFFF,
+        scale=2, line_spacing=1.2,
+        anchor_point=(0.5, 0),
+        anchored_position=(S.display.width // 2, 30),
+    )
+    S.splash[1] = S.status_label
 
     S.display_dirty = True
 
