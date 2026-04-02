@@ -5,7 +5,8 @@ from adafruit_midi.program_change import ProgramChange
 from adafruit_midi.control_change import ControlChange
 from adafruit_midi.note_on import NoteOn
 import state as S
-from config import load_page, _resolve
+import terminalio
+from config import load_page, list_configs, _resolve
 
 
 # =============================================================================
@@ -474,3 +475,263 @@ def process_capture_cc(channel, control, value):
 
     S.display_dirty = True
     return True
+
+
+# =============================================================================
+# MULTI-CONFIG SUPPORT
+#
+# Configurations are named subfolders under ultrasetup/ (e.g. init/, live_rig/).
+# At boot the firmware picks "init" (or first alphabetically) and loads its
+# page0.txt.  At runtime, Explorer Mode lets the user browse and switch configs
+# without a computer.
+#
+# Display isolation: Explorer Mode creates its own displayio.Group and swaps it
+# in via S.display.show(grp).  The performance display (S.splash) is untouched
+# while explorer is active.  On exit or confirm, S.display.show(S.splash)
+# restores performance mode.
+#
+# LED feedback: each key gets a role-colored LED (purple=nav, cyan=page,
+# red=cancel, green=confirm).  LEDs are dim at idle and brighten on press.
+# =============================================================================
+
+def switch_config(name):
+    """Load a named config and enter performance mode.
+
+    Called from explorer_key(5) on confirm.  Sequence:
+    1. Set cfg_name and reset page counter to 0
+    2. Parse the new config's page0.txt
+    3. Clear explorer LEDs and restore the performance display group
+    4. Apply the page layout (LEDs, labels, sublabels)
+    5. Run the page's init_commands (same as boot)
+    """
+    S.cfg_name = name
+    S.page_cur = 0
+    S.cfg = load_page(0)
+    S.pixels.fill((0, 0, 0))
+    S.pixels.show()
+    S.display.show(S.splash)       # restore performance display group
+    apply_page()
+    exec_commands(S.cfg["init_commands"])
+    S._page_switched = True
+
+
+def _explorer_render():
+    """Re-draw the explorer list from current cursor/scroll state.
+
+    Updates the 6 visible item labels and the scroll indicators.
+    Color coding: yellow = cursor + active config, white = cursor only,
+    green = active config, grey = other.  Items are prefixed with "> "
+    for the cursor or "  " otherwise, capped at 14 chars.
+    """
+    configs = S._explorer_configs
+    scroll  = S._explorer_scroll
+    cursor  = S._explorer_cursor
+    n       = len(configs)
+
+    # Scroll indicators: show "^"/"v" when more items exist above/below
+    S._explorer_up_lbl.text = "^" if scroll > 0 else " "
+    S._explorer_dn_lbl.text = "v" if scroll + 6 < n else " "
+
+    # Fill the 6 visible slots from the scroll window
+    for slot in range(6):
+        idx = scroll + slot
+        lbl = S._explorer_item_lbls[slot]
+        if idx < n:
+            name = configs[idx]
+            is_cursor = (idx == cursor)
+            is_active = (name == S.cfg_name)
+            prefix = "> " if is_cursor else "  "
+            lbl.text = (prefix + name)[:14]
+            if is_cursor and is_active:
+                lbl.color = 0xFFFF00    # yellow: cursor on active config
+            elif is_cursor:
+                lbl.color = 0xFFFFFF    # white: cursor position
+            elif is_active:
+                lbl.color = 0x00CC00    # green: currently loaded config
+            else:
+                lbl.color = 0x666666    # grey: other configs
+        else:
+            lbl.text = ""
+
+
+# Explorer LED colors — full intensity (shown while key is held)
+_EXPLORER_LEDS_FULL = (
+    (128, 0, 128),  # key 0: purple  (cursor up)
+    (0, 128, 128),  # key 1: cyan    (page up)
+    (255, 0, 0),    # key 2: red     (cancel)
+    (128, 0, 128),  # key 3: purple  (cursor down)
+    (0, 128, 128),  # key 4: cyan    (page down)
+    (0, 255, 0),    # key 5: green   (confirm)
+)
+# Dim version (shown at idle) — each channel halved
+_EXPLORER_LEDS_DIM = tuple(
+    tuple(v // 2 for v in c) for c in _EXPLORER_LEDS_FULL
+)
+
+
+def explorer_press(key_idx):
+    """Set full-brightness LED for a key pressed during explorer mode.
+
+    Called on falling edge (press confirmed) in key_check().
+    The corresponding explorer_key() call on release will restore dim.
+    """
+    c = _EXPLORER_LEDS_FULL[key_idx]
+    for led in range(3):
+        S.pixels[key_idx * 3 + led] = c
+    S.pixels.show()
+
+
+def enter_explorer():
+    """Activate Explorer Mode: build the config-browser UI and show it.
+
+    Called when SW3+SWA are held for LONGPRESS_SEC.  Creates a separate
+    displayio.Group with:
+      - Title label: "SELECT CONFIG" (24pt, centered, y=4)
+      - Scroll-up indicator: "^" or " " (terminal font 2x, y=36)
+      - 6 item labels: config names (24pt, left-aligned, y=56..196)
+      - Scroll-down indicator: "v" or " " (terminal font 2x, y=222)
+
+    The cursor starts on the currently active config.  All 6 physical
+    LEDs are set to their role color at dim intensity.  The explorer
+    group replaces S.splash via S.display.show().
+    """
+    configs = list_configs()
+
+    # Place cursor on the currently active config
+    cursor = 0
+    for i in range(len(configs)):
+        if configs[i] == S.cfg_name:
+            cursor = i
+            break
+    # Scroll window: page of 6 that contains the cursor
+    scroll = (cursor // 6) * 6
+
+    # --- Build the explorer display group (plain Labels, no tiles) ---
+    grp = displayio.Group()
+
+    title = S._lmod.Label(S.FONT_SUBGRID, text="SELECT CONFIG",
+                          color=0xFFFFFF, anchor_point=(0.5, 0.0),
+                          anchored_position=(120, 4))
+    grp.append(title)
+
+    up_lbl = S._lmod.Label(terminalio.FONT, text=" ", color=0x888888, scale=2,
+                           anchor_point=(0.5, 0.0), anchored_position=(120, 36))
+    grp.append(up_lbl)
+
+    item_lbls = []
+    for slot in range(6):
+        lbl = S._lmod.Label(S.FONT_SUBGRID, text="", color=0x666666,
+                            anchor_point=(0.0, 0.0),
+                            anchored_position=(4, 56 + slot * 28))
+        grp.append(lbl)
+        item_lbls.append(lbl)
+
+    dn_lbl = S._lmod.Label(terminalio.FONT, text=" ", color=0x888888, scale=2,
+                           anchor_point=(0.5, 0.0), anchored_position=(120, 222))
+    grp.append(dn_lbl)
+
+    # Store references on state for access by _explorer_render / explorer_key
+    S._explorer_grp       = grp
+    S._explorer_up_lbl    = up_lbl
+    S._explorer_dn_lbl    = dn_lbl
+    S._explorer_item_lbls = item_lbls
+    S._explorer_configs   = configs
+    S._explorer_cursor    = cursor
+    S._explorer_scroll    = scroll
+    S.explorer_mode       = True
+
+    # Set all LEDs to dim role colors (brighten on press via explorer_press)
+    for k in range(6):
+        for led in range(3):
+            S.pixels[k * 3 + led] = _EXPLORER_LEDS_DIM[k]
+    S.pixels.show()
+
+    # Swap display to explorer group, render the list, push to screen
+    S.display.show(grp)
+    _explorer_render()
+    S.display.refresh()
+
+
+def exit_explorer():
+    """Leave Explorer Mode without changing config (cancel).
+
+    Clears all explorer state, resets LEDs to black, restores S.splash
+    as the active display group, and re-applies the current page layout
+    (LEDs, labels, init_commands) so performance mode is fully restored.
+    """
+    S.explorer_mode       = False
+    S._explorer_grp       = None
+    S._explorer_up_lbl    = None
+    S._explorer_dn_lbl    = None
+    S._explorer_item_lbls = None
+    S._explorer_configs   = None
+    S.pixels.fill((0, 0, 0))
+    S.pixels.show()
+    S.display.show(S.splash)
+    apply_page()
+    exec_commands(S.cfg["init_commands"])
+
+
+def explorer_key(key_idx):
+    """Handle a key release while in Explorer Mode.
+
+    Key mapping:
+      0 = cursor up       3 = cursor down
+      1 = page up (6)     4 = page down (6)
+      2 = cancel           5 = confirm (load selected config)
+
+    Cancel and confirm exit explorer mode (via return) before reaching
+    the LED-restore / render code at the bottom.  Navigation keys (0,1,3,4)
+    fall through to restore their dim LED and re-render the list.
+    """
+    configs = S._explorer_configs
+    n       = len(configs)
+
+    if key_idx == 0:                        # cursor up
+        if S._explorer_cursor > 0:
+            S._explorer_cursor -= 1
+            # Scroll window follows cursor when it moves above the top
+            if S._explorer_cursor < S._explorer_scroll:
+                S._explorer_scroll -= 6
+
+    elif key_idx == 1:                      # page up — jump 6 items
+        S._explorer_cursor = max(0, S._explorer_cursor - 6)
+        S._explorer_scroll = (S._explorer_cursor // 6) * 6
+
+    elif key_idx == 2:                      # cancel — exit, no config change
+        exit_explorer()
+        return
+
+    elif key_idx == 3:                      # cursor down
+        if S._explorer_cursor < n - 1:
+            S._explorer_cursor += 1
+            # Scroll window follows cursor when it moves below the bottom
+            if S._explorer_cursor >= S._explorer_scroll + 6:
+                S._explorer_scroll += 6
+
+    elif key_idx == 4:                      # page down — jump 6 items
+        S._explorer_cursor = min(n - 1, S._explorer_cursor + 6)
+        S._explorer_scroll = (S._explorer_cursor // 6) * 6
+
+    elif key_idx == 5:                      # confirm — load selected config
+        if 0 <= S._explorer_cursor < n:
+            name = configs[S._explorer_cursor]
+            # Tear down explorer state before switching
+            S.explorer_mode       = False
+            S._explorer_grp       = None
+            S._explorer_up_lbl    = None
+            S._explorer_dn_lbl    = None
+            S._explorer_item_lbls = None
+            S._explorer_configs   = None
+            switch_config(name)   # restores display, LEDs, runs init_commands
+        return
+
+    # --- Navigation keys (0,1,3,4) reach here ---
+    # Restore dim LED for the key that was just released
+    c = _EXPLORER_LEDS_DIM[key_idx]
+    for led in range(3):
+        S.pixels[key_idx * 3 + led] = c
+    S.pixels.show()
+    # Re-render the list with updated cursor/scroll and push to display
+    _explorer_render()
+    S.display.refresh()

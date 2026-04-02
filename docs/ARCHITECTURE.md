@@ -61,7 +61,7 @@ UART bypasses `adafruit_midi` to work around CP 7.3.1 buffering quirks.
 
 ### MIDI Input
 
-USB-MIDI only (`usb_midi.ports[0]`), all 16 channels. Receives CC messages for virtual-key control.
+USB-MIDI and DIN-5 UART (`usb_midi.ports[0]` + UART RX), all 16 channels. Receives CC messages for virtual-key control. UART input uses a custom running-status parser.
 
 ### Boot Mode (GP1 / SW1, read in boot.py)
 
@@ -79,7 +79,9 @@ CircuitPython auto-executes `code.py` on boot. There is no OS; the firmware is a
 ### Boot sequence
 
 1. **boot.py** reads GP1 to select USB-drive vs. normal mode; sets filesystem writability.
-2. **code.py** initialises all hardware (SPI display, PWM backlight, GPIO switches, NeoPixels, UART), loads fonts, reads global aliases from `ultrasetup/aliases.txt`, loads page 0 config from `ultrasetup/page0.txt`, builds the display layer stack, then enters the async event loop.
+2. **code.py** initialises all hardware (SPI display, PWM backlight, GPIO switches, NeoPixels, UART), loads fonts, reads global aliases from `ultrasetup/aliases.txt`.
+3. **Config discovery**: scans `ultrasetup/` for named config subfolders. Prefers `init/` if it exists, otherwise picks the first subdirectory alphabetically. Sets `S.cfg_name` to the chosen config name.
+4. Loads `ultrasetup/<config>/page0.txt`, builds the display layer stack, applies the page layout (LEDs, labels, sublabels), runs `init_commands`, then enters the async event loop.
 
 ### Async event loop
 
@@ -89,7 +91,7 @@ CircuitPython auto-executes `code.py` on boot. There is no OS; the firmware is a
 main()
  |-- key_check()     switch polling, debounce, press/long-press detection
  |-- disp_task()     batched display refresh
- +-- midi_in_task()  USB-MIDI input polling
+ +-- midi_in_task()  USB-MIDI + UART MIDI input polling
 ```
 
 All three yield cooperatively with `await asyncio.sleep(0)`.
@@ -101,9 +103,26 @@ Polls all 6 GPIOs every iteration with a per-key state machine:
 - **Debounce:** 20 ms stability window.
 - **Short press:** fires on *release* (hold < 500 ms).
 - **Long press:** fires as soon as 500 ms threshold is crossed while still held.
-- **Combos:** SW1+SW3+SWA+SWC held 2 s triggers microcontroller.reset(); SW1+SW3 held 1 s hot-reloads the current page.
+- **Key combos** (checked after the per-key loop each iteration):
+
+| Combo | Hold time | Action | Notes |
+|-------|-----------|--------|-------|
+| SW3 + SWA (keys 2+3) | 0.5 s | Enter Explorer Mode | Config browser; releases are suppressed to prevent false cancel/down |
+| SW1 + SW3 (keys 0+2) | 1.0 s | Hot-reload current page | Disabled while Explorer Mode is active |
+| SW1 + SW3 + SWA + SWC (keys 0+2+3+5) | 2.0 s | Reboot (microcontroller.reset) | Disabled while Explorer Mode is active |
 
 On a confirmed event the task advances the key cycle position, executes the command list for that step/action, updates LEDs, and queues pending label changes (setting `display_dirty = True`).
+
+**Explorer mode gating:** When `S.explorer_mode` is True, key events are
+routed to `explorer_press()` (falling edge) and `explorer_key()` (rising edge)
+instead of the normal performance handlers. Long-press detection still runs
+(for the `is_long` flag) but `longpress_key()` is skipped. The reload and
+reboot combos are gated out entirely.
+
+**Combo suppression:** When the SW3+SWA explorer combo fires, a
+`_combo23_suppressed` flag is set. This prevents the subsequent release of
+keys 2 and 3 from triggering `explorer_key(2)` (cancel) or `explorer_key(3)`
+(cursor down). The flag clears once both keys are fully released.
 
 #### disp_task(): display management
 
@@ -111,13 +130,15 @@ Decouples rendering from input so that glyph rasterisation never blocks switch p
 
 1. Watches `display_dirty`.
 2. When set, applies all pending text and colour changes to `displayio` label objects in one batch.
-3. Clears the flag and yields.
+3. Clears the flag, calls `display.refresh()`, and yields.
 
-ST7789 runs with `auto_refresh=True`; DMA pushes the framebuffer in the background.
+ST7789 runs with `auto_refresh=False`; `display.refresh()` is called explicitly after each batch update or explorer render.
+
+**Explorer mode:** `disp_task()` is not involved in explorer rendering. Explorer mode never sets `display_dirty`; instead, `_explorer_render()` and `enter_explorer()` call `S.display.refresh()` directly after updating the explorer group. The two display paths do not interfere.
 
 #### midi_in_task(): external control
 
-Polls USB-MIDI for ControlChange messages matching the configured channel/CC (`ext_capture_cc`). CC value encodes both the key index (bits 0-4) and the action type (bits 5-6):
+Polls both USB-MIDI and DIN-5 UART for incoming messages. ControlChange messages matching the configured channel/CC (`ext_capture_cc`) trigger virtual-key events. CC value encodes both the key index (bits 0-4) and the action type (bits 5-6):
 
 | Value range | Action |
 |-------------|--------|
@@ -126,11 +147,11 @@ Polls USB-MIDI for ControlChange messages matching the configured channel/CC (`e
 | 0x40-0x5F   | Short release |
 | 0x60-0x7F   | Long release |
 
-Optionally forwards all incoming MIDI to output (midi_thru).
+Optionally forwards all incoming MIDI to the other output (midi_thru): USB input is forwarded to DIN-5, DIN-5 input is forwarded to USB.
 
 ### Display layer stack
 
-10-layer displayio.Group:
+10-layer displayio.Group (S.splash — the performance display):
 
 | Layer | Content |
 |-------|---------|
@@ -141,6 +162,12 @@ Optionally forwards all incoming MIDI to output (midi_thru).
 | 9 | Page label: terminal font at 2x scale |
 
 Text colour auto-inverts (white on dark / black on bright) via luminance calculation.
+
+**Explorer Mode display:** A separate `displayio.Group` is created on entry
+with plain `Label` objects only (no tiles). It is swapped in via
+`S.display.show(grp)` and swapped out via `S.display.show(S.splash)` on exit.
+See [Explorer Mode in PAGES.md](PAGES.md#explorer-mode--switching-configs-at-runtime)
+for the display layout and key map.
 
 ### Key behavioural model
 
@@ -164,16 +191,24 @@ Config-driven. Each key/step/action maps to a list of commands:
 
 ### Configuration
 
-- **Page files:** `ultrasetup/pageN.txt` in INI-like format with bracket-delimited values. Sections: [global], [page], [key0] through [key31].
-- **Aliases:** `ultrasetup/aliases.txt` maps symbolic names to integers (e.g. tx_gain = 102) for use in page files.
+- **Configs:** each configuration is a named subfolder under `ultrasetup/` (e.g. `init/`, `live_rig/`). The active config is chosen at boot (`init/` preferred, else first alphabetically). Can be switched at runtime via Explorer Mode.
+- **Page files:** `ultrasetup/<config>/pageN.txt` in INI-like format with bracket-delimited values. Sections: [global], [page], [key0] through [key31].
+- **Aliases:** `ultrasetup/aliases.txt` (global, top-level) maps symbolic names to integers (e.g. tx_gain = 102) for use in all page files across all configs.
+- **Explorer Mode:** SW3+SWA held 0.5 s opens a full-screen config browser. Uses a dedicated `displayio.Group` with plain `Label` objects (no tiles). LEDs show role colors at dim intensity, brightening on press. On confirm, `switch_config()` loads page 0 of the selected config and returns to performance mode.
 
 ## File Map
 
 | Path | Role |
 |------|------|
 | boot.py | Boot-mode selection (USB drive vs. normal) |
-| code.py | Entire firmware (~1115 lines): hardware init, async tasks, config parser, MIDI engine, display renderer |
+| code.py | Main entry point: hardware init, async tasks (key_check, disp_task, midi_in_task) |
+| state.py | Shared runtime state, constants, and hardware references |
+| config.py | Config file parser: aliases, list_configs(), load_page() |
+| engine.py | Command execution, key handlers, page/config switching, Explorer Mode |
+| validate.py | Page config validator (runs on-device at page load) |
 | lib/ | Pre-compiled CircuitPython libraries (~133 KB): asyncio, adafruit_midi, adafruit_st7789, neopixel, display_text, bitmap_font, etc. |
-| ultrasetup/ | User configuration: page files (pageN.txt), aliases (aliases.txt) |
-| fonts/ | PCF bitmap fonts (~209 KB): Bahnschrift at 24, 32, 48 pt |
+| ultrasetup/aliases.txt | Global MIDI aliases shared by all configs |
+| ultrasetup/&lt;config&gt;/ | Named configuration folder; contains page0.txt, page1.txt, ... |
+| ultrasetup/page-template.txt | Reference template with all config options documented |
+| fonts/ | PCF bitmap fonts (~209 KB): Bahnschrift at 24, 32, 48, 64 pt |
 | wallpaper/ | Optional BMP background images (~174 KB) |

@@ -111,9 +111,45 @@ def parse_color_int(s):
     return int(s, 16)
 
 
-def load_page(page_num):
-    """Load and parse ultrasetup/page{page_num}.txt into a cfg dict."""
-    filename = "ultrasetup/page{}.txt".format(page_num)
+def list_configs():
+    """Return sorted list of config subdirectory names under ultrasetup/.
+
+    Each configuration is a named subfolder (e.g. ultrasetup/init/,
+    ultrasetup/live_rig/).  Files (anything with a dot in the name, like
+    aliases.txt) are skipped.  Directories are identified via the stat
+    flag 0x4000 (S_IFDIR), which is the portable way on CircuitPython.
+    Results are capped at 32 entries to match NUM_TOTAL_KEYS.
+    """
+    result = []
+    try:
+        entries = os.listdir("ultrasetup")
+    except OSError:
+        return result
+    for name in entries:
+        if len(result) >= 32:
+            break
+        if "." in name:          # skip files like aliases.txt, page-template.txt
+            continue
+        try:
+            # os.stat()[0] is st_mode; bit 0x4000 = directory
+            if os.stat("ultrasetup/{}".format(name))[0] & 0x4000:
+                result.append(name)
+        except OSError:
+            pass
+    result.sort()
+    return result
+
+
+def load_page(page_num, config_name=None):
+    """Load and parse a page config file into a cfg dict.
+
+    Path: ultrasetup/<config_name>/page<page_num>.txt
+    If config_name is None, uses the currently active config (S.cfg_name).
+    Returns a complete cfg dict with defaults for any missing fields.
+    """
+    if config_name is None:
+        config_name = S.cfg_name
+    filename = "ultrasetup/{}/page{}.txt".format(config_name, page_num)
 
     cfg = {
         "page_name": "PAGE {}".format(page_num),

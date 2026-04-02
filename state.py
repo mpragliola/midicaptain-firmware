@@ -28,6 +28,8 @@ display_dirty  = False
 _page_switched = False
 _active_key    = None
 _pc_state      = {}
+cfg_name       = "init"   # active config subdirectory name under ultrasetup/
+explorer_mode  = False    # True while the config-browser overlay is active
 
 # Pending display updates
 _pending_status     = None
@@ -49,6 +51,17 @@ _SUB_GRID_X  = [40, 120, 200]
 _VIS_MAIN_FONT    = None
 _VIS_MAIN_LABEL_Y = [0, 30, 30, 43, 35]
 _VIS_SUB_AREA_TOP = [28, 62, 70, 161, 161]
+
+# Explorer mode runtime state.
+# Populated by enter_explorer(), cleared to None by exit_explorer()/confirm.
+# These are transient — only valid while explorer_mode is True.
+_explorer_grp       = None   # the displayio.Group shown during explorer
+_explorer_up_lbl    = None   # "^" scroll-up indicator Label
+_explorer_dn_lbl    = None   # "v" scroll-down indicator Label
+_explorer_item_lbls = None   # list of 6 Label objects (visible item slots)
+_explorer_configs   = None   # sorted list of config subfolder names
+_explorer_cursor    = 0      # index into _explorer_configs of highlighted item
+_explorer_scroll    = 0      # index of the first visible item (multiple of 6)
 
 # Hardware references (set by code.py during init)
 pixels = None

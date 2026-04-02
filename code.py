@@ -28,8 +28,10 @@ except ImportError:
 from adafruit_st7789 import ST7789
 
 import state as S
-from config import load_page
+from config import load_page, list_configs     # list_configs: discover config subdirectories
 from engine import (exec_commands, apply_page, switch_page,
+                    switch_config, enter_explorer, exit_explorer, explorer_key,
+                    explorer_press,                 # LED feedback on key press in explorer
                     press_key, longpress_key, release_key,
                     process_capture_cc)
 
@@ -177,6 +179,16 @@ except (IndexError, AttributeError, ValueError) as e:
 # =============================================================================
 # BOOT
 # =============================================================================
+# --- Config discovery ---
+# Scan ultrasetup/ for named config subfolders (e.g. init/, live_rig/).
+# Prefer "init" if it exists, otherwise pick the first alphabetically.
+# If no subfolders exist, cfg_name stays "init" and load_page will
+# return a default empty config (the file simply won't be found).
+_startup_cfgs = list_configs()
+if "init" in _startup_cfgs:
+    S.cfg_name = "init"
+elif _startup_cfgs:
+    S.cfg_name = _startup_cfgs[0]
 S.cfg = load_page(S.page_cur)
 
 # Apply background once — loaded from [global], never changed on page switches
@@ -206,8 +218,12 @@ async def key_check():
     debounce_ts = [0.0]   * 6
     press_ts    = [0.0]   * 6
     is_long     = [False] * 6
-    combo_start  = None
-    reload_start = None
+    combo_start      = None
+    reload_start     = None
+    explorer_start   = None     # timestamp when SW3+SWA both became held (or None)
+    _combo23_suppressed = False  # when True, suppress SW3/SWA release events
+                                 # to prevent cancel/down from firing right after
+                                 # the explorer combo activates
 
     while True:
         now = time.monotonic()
@@ -225,57 +241,98 @@ async def key_check():
                     # Falling edge (press confirmed)
                     press_ts[i] = now
                     is_long[i]  = False
-                    kc_i = S.cfg["keys"][i]
-                    next_step = (S.cycle_pos[i] + 1) % kc_i["cycle"]
-                    if kc_i["commands"].get((next_step + 1, "dn")):
-                        if S.DEBUG:
-                            print("[KEY] {} | dn  | step={}".format(S.KEY_NAMES[i], next_step + 1))
-                        press_key(i)
-                        S._dn_advanced[i] = True
+                    S._dn_advanced[i] = False
+                    if S.explorer_mode:
+                        # In explorer: brighten LED on press (visual feedback)
+                        explorer_press(i)
                     else:
-                        S._dn_advanced[i] = False
+                        kc_i = S.cfg["keys"][i]
+                        next_step = (S.cycle_pos[i] + 1) % kc_i["cycle"]
+                        if kc_i["commands"].get((next_step + 1, "dn")):
+                            if S.DEBUG:
+                                print("[KEY] {} | dn  | step={}".format(S.KEY_NAMES[i], next_step + 1))
+                            press_key(i)
+                            S._dn_advanced[i] = True
                 else:
                     # Rising edge (release confirmed)
-                    if is_long[i]:
-                        if S.DEBUG:
-                            print("[KEY] {} | lup".format(S.KEY_NAMES[i]))
-                        release_key(i, long_press=True)
+                    if S.explorer_mode:
+                        # In explorer mode, dispatch release to explorer_key().
+                        # Suppress keys 2+3 if they were part of the combo that
+                        # just entered explorer — otherwise releasing them would
+                        # immediately trigger cancel (2) or cursor-down (3).
+                        _suppress = _combo23_suppressed and i in (2, 3)
+                        if not _suppress:
+                            explorer_key(i)
                     else:
-                        if not S._dn_advanced[i]:
-                            _next = (S.cycle_pos[i] + 1) % max(1, S.cfg["keys"][i]["cycle"])
+                        if is_long[i]:
                             if S.DEBUG:
-                                print("[KEY] {} | dn  | step={} (deferred)".format(S.KEY_NAMES[i], _next + 1))
-                            press_key(i)
-                        if S.DEBUG:
-                            print("[KEY] {} | up".format(S.KEY_NAMES[i]))
-                        release_key(i, long_press=False)
+                                print("[KEY] {} | lup".format(S.KEY_NAMES[i]))
+                            release_key(i, long_press=True)
+                        else:
+                            if not S._dn_advanced[i]:
+                                _next = (S.cycle_pos[i] + 1) % max(1, S.cfg["keys"][i]["cycle"])
+                                if S.DEBUG:
+                                    print("[KEY] {} | dn  | step={} (deferred)".format(S.KEY_NAMES[i], _next + 1))
+                                press_key(i)
+                            if S.DEBUG:
+                                print("[KEY] {} | up".format(S.KEY_NAMES[i]))
+                            release_key(i, long_press=False)
 
             elif not raw[i] and not debounced[i] and not is_long[i]:
                 if (now - press_ts[i]) >= S.LONGPRESS_SEC:
                     is_long[i] = True
-                    if S.DEBUG:
-                        print("[KEY] {} | ldn".format(S.KEY_NAMES[i]))
-                    longpress_key(i)
+                    # Skip long-press handler in explorer mode — keys are
+                    # navigation-only, no MIDI commands should fire.
+                    if not S.explorer_mode:
+                        if S.DEBUG:
+                            print("[KEY] {} | ldn".format(S.KEY_NAMES[i]))
+                        longpress_key(i)
 
-        # Reload combo
-        if all(not debounced[i] for i in S.RELOAD_COMBO):
-            if reload_start is None:
-                reload_start = now
-            elif now - reload_start >= S.RELOAD_HOLD_SEC:
+        # --- Combo suppression cleanup ---
+        # Once both SW3 and SWA are fully released after the explorer combo
+        # fired, clear the suppression flag so future presses work normally.
+        if _combo23_suppressed and debounced[2] and debounced[3]:
+            _combo23_suppressed = False
+
+        # --- Explorer combo: SW3 + SWA (indices 2+3) held simultaneously ---
+        # Fires after LONGPRESS_SEC (0.5s).  This is shorter than the reload
+        # combo (1s) and reboot combo (2s), both of which are gated out while
+        # explorer_mode is True, so there's no conflict.
+        if not debounced[2] and not debounced[3] and not S.explorer_mode:
+            if explorer_start is None:
+                explorer_start = now
+            elif now - explorer_start >= S.LONGPRESS_SEC:
+                explorer_start      = None
+                _combo23_suppressed = True   # suppress upcoming key 2+3 releases
+                is_long[2] = True   # prevent normal longpress from also firing
+                is_long[3] = True
+                enter_explorer()
+        else:
+            # Reset timer if either key is released before threshold
+            if debounced[2] or debounced[3]:
+                explorer_start = None
+
+        # --- Reload and reboot combos (disabled during explorer mode) ---
+        if not S.explorer_mode:
+            # Reload combo
+            if all(not debounced[i] for i in S.RELOAD_COMBO):
+                if reload_start is None:
+                    reload_start = now
+                elif now - reload_start >= S.RELOAD_HOLD_SEC:
+                    reload_start = None
+                    switch_page(S.page_cur)
+                    S._page_switched = False
+            else:
                 reload_start = None
-                switch_page(S.page_cur)
-                S._page_switched = False
-        else:
-            reload_start = None
 
-        # Reboot combo
-        if all(not debounced[i] for i in S.REBOOT_COMBO):
-            if combo_start is None:
-                combo_start = now
-            elif now - combo_start >= S.REBOOT_HOLD_SEC:
-                microcontroller.reset()
-        else:
-            combo_start = None
+            # Reboot combo
+            if all(not debounced[i] for i in S.REBOOT_COMBO):
+                if combo_start is None:
+                    combo_start = now
+                elif now - combo_start >= S.REBOOT_HOLD_SEC:
+                    microcontroller.reset()
+            else:
+                combo_start = None
 
         await asyncio.sleep(0)
 

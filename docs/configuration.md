@@ -16,8 +16,9 @@ A companion editor will be available  in the future.
 
 ### How to edit
 
-The configuration text files are under `/ultrasetup` and can
-be edited with any text editor.
+The configuration text files are under `/ultrasetup/<config_name>/` and can
+be edited with any text editor. Each configuration has its own subfolder
+(see [Multiple configurations](#multiple-configurations) below).
 
 They are called `page0.txt`, `page1.txt`, ... and contain 
 the configuration for each page and in case of page 0, also
@@ -43,6 +44,60 @@ config_param3 = [val1][val2][val3] [val4][val5][val6]
 
 >You can find a complete breakdown of the file format specs
 > in [the page template file](../ultrasetup/page-template.txt).
+
+### Multiple configurations
+
+The device can store several independent configurations. Each one lives in its
+own subfolder under `ultrasetup/`:
+
+```
+ultrasetup/
+  aliases.txt          <-- global aliases (shared by all configs)
+  page-template.txt    <-- reference template (not loaded by firmware)
+  init/
+    page0.txt
+    page1.txt
+    ...
+  live_rig/
+    page0.txt
+    ...
+```
+
+Each subfolder is a self-contained configuration with its own page files.
+The `aliases.txt` file is global and shared across all configurations.
+
+**Startup rule:** The firmware loads `init/` on boot. If that folder does not
+exist, the first subfolder alphabetically is loaded instead. If no subfolders
+exist, the firmware starts with an empty default config.
+
+**Switching at runtime:** Hold **SW3 + SWA** simultaneously for 0.5 s to open
+Explorer Mode — a full-screen config browser. The display shows a scrollable
+list of all available configs. Use the footswitches to navigate:
+
+| Key | Action |
+|-----|--------|
+| SW1 (key 0) | Cursor up |
+| SW2 (key 1) | Page up (6 items) |
+| SW3 (key 2) | Cancel (exit, no change) |
+| SWA (key 3) | Cursor down |
+| SWB (key 4) | Page down (6 items) |
+| SWC (key 5) | Confirm (load selected config) |
+
+LEDs indicate each key's role: purple for navigation, cyan for page scroll,
+red for cancel, green for confirm. LEDs are dim at idle and brighten on press.
+
+See [Explorer Mode in PAGES.md](PAGES.md#explorer-mode--switching-configs-at-runtime)
+for the full reference including display layout and color coding.
+
+**Migration from single-config firmware (breaking change):**
+
+> The old flat structure (`ultrasetup/page0.txt`, ...) is no longer supported.
+
+1. Boot in USB mode (hold SW1 while powering on).
+2. Create `ultrasetup/init/` on the MIDICAPTAIN drive.
+3. Move all `page*.txt` files into `ultrasetup/init/`.
+4. Leave `aliases.txt` at `ultrasetup/aliases.txt` — it is still global.
+5. Safely eject and reboot.
 
 #### Caveat
 
