@@ -1,5 +1,5 @@
 __pycache__/
-.claude/
+.claude/settings.json
 .dropbox.device
 .fseventsd/
 System Volume Information/
