@@ -546,8 +546,8 @@ def _explorer_render():
             lbl.text = ""
 
 
-# Explorer LED colors — full intensity (shown while key is held)
-_EXPLORER_LEDS_FULL = (
+# Explorer LED colors — base palette
+_EXPLORER_LEDS_BASE = (
     (128, 0, 128),  # key 0: purple  (cursor up)
     (0, 128, 128),  # key 1: cyan    (page up)
     (255, 0, 0),    # key 2: red     (cancel)
@@ -555,9 +555,13 @@ _EXPLORER_LEDS_FULL = (
     (0, 128, 128),  # key 4: cyan    (page down)
     (0, 255, 0),    # key 5: green   (confirm)
 )
-# Dim version (shown at idle) — each channel halved
+# Full intensity (shown while key is held) — halved from base
+_EXPLORER_LEDS_FULL = tuple(
+    tuple(v // 2 for v in c) for c in _EXPLORER_LEDS_BASE
+)
+# Dim version (shown at idle) — quartered from base
 _EXPLORER_LEDS_DIM = tuple(
-    tuple(v // 2 for v in c) for c in _EXPLORER_LEDS_FULL
+    tuple(v // 4 for v in c) for c in _EXPLORER_LEDS_BASE
 )
 
 
