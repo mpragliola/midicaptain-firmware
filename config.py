@@ -21,7 +21,8 @@ from validate import validate_cfg
 #   specific mapping as mnemonic.
 #
 # Important: the substitutions are "stupid", make sure you choose an alias
-# that is unlikely to be matched by unrelated values, f. ex. by using prefixes.
+# that is unlikely to be matched by unrelated values or commands, f. ex. by 
+# using prefixes.
 # =============================================================================
 _aliases = {}
 try:

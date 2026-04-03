@@ -34,6 +34,7 @@ import state as S
 from config import list_configs
 from pages import Page
 from display import Display
+import explorer  # noqa: F401 — registers S.explorer before any key events fire
 from engine import (exec_commands, apply_page, switch_page,
                     enter_explorer, explorer_key,
                     explorer_press,
@@ -188,7 +189,7 @@ async def key_check():
                     press_ts[i] = now
                     is_long[i]  = False
                     S._dn_advanced[i] = False
-                    if S.explorer_mode:
+                    if S.explorer.active:
                         # In explorer: brighten LED on press (visual feedback)
                         explorer_press(i)
                     else:
@@ -201,7 +202,7 @@ async def key_check():
                             S._dn_advanced[i] = True
                 else:
                     # Rising edge (release confirmed)
-                    if S.explorer_mode:
+                    if S.explorer.active:
                         # In explorer mode, dispatch release to explorer_key().
                         # Suppress keys 2+3 if they were part of the combo that
                         # just entered explorer — otherwise releasing them would
@@ -229,7 +230,7 @@ async def key_check():
                     is_long[i] = True
                     # Skip long-press handler in explorer mode — keys are
                     # navigation-only, no MIDI commands should fire.
-                    if not S.explorer_mode:
+                    if not S.explorer.active:
                         if S.DEBUG:
                             print("[KEY] {} | ldn".format(S.KEY_NAMES[i]))
                         longpress_key(i)
@@ -243,8 +244,8 @@ async def key_check():
         # --- Explorer combo: SW3 + SWA (indices 2+3) held simultaneously ---
         # Fires after LONGPRESS_SEC (0.5s).  This is shorter than the reload
         # combo (1s) and reboot combo (2s), both of which are gated out while
-        # explorer_mode is True, so there's no conflict.
-        if not debounced[2] and not debounced[3] and not S.explorer_mode:
+        # explorer is active, so there's no conflict.
+        if not debounced[2] and not debounced[3] and not S.explorer.active:
             if explorer_start is None:
                 explorer_start = now
             elif now - explorer_start >= S.LONGPRESS_SEC:
@@ -259,7 +260,7 @@ async def key_check():
                 explorer_start = None
 
         # --- Reload and reboot combos (disabled during explorer mode) ---
-        if not S.explorer_mode:
+        if not S.explorer.active:
             # Reload combo
             if all(not debounced[i] for i in S.RELOAD_COMBO):
                 if reload_start is None:
