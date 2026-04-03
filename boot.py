@@ -6,11 +6,13 @@ import time
 import supervisor
 supervisor.disable_autoreload()
 
-switch = digitalio.DigitalInOut(board.GP1)  # change for the final product
+switch = digitalio.DigitalInOut(board.GP1) 
 switch.direction = digitalio.Direction.INPUT
 switch.pull = digitalio.Pull.UP
 time.sleep(0.05)
 
+# If the switch is pressed, disable USB drive and remount as read/write. 
+# Otherwise, enable USB drive and remount as read-only.
 
 if switch.value is True:
     storage.disable_usb_drive()
