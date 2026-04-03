@@ -35,7 +35,7 @@ from config import list_configs
 from pages import Page
 from display import Display
 from engine import (exec_commands, apply_page, switch_page,
-                    switch_config, enter_explorer, exit_explorer, explorer_key,
+                    enter_explorer, explorer_key,
                     explorer_press,
                     press_key, longpress_key, release_key,
                     process_capture_cc)
