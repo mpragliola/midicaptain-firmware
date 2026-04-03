@@ -25,22 +25,6 @@ from validate import validate_cfg
 # using prefixes.
 # =============================================================================
 _aliases = {}
-try:
-    with open("ultrasetup/aliases.txt") as _af:
-        for _line in _af:
-            _line = _line.strip()
-            if not _line or _line.startswith(";"):
-                continue
-            if "=" in _line:
-                _ak, _, _av = _line.partition("=")
-                _ak = _ak.strip()
-                _av = _av.partition(";")[0].strip()
-                try:
-                    _aliases[_ak] = int(_av)
-                except ValueError:
-                    pass
-except OSError:
-    pass
 
 
 def _resolve(s):
@@ -73,6 +57,46 @@ def parse_brackets(s):
     return result
 
 
+def _expand_aliases(vals):
+    """Expand tuple aliases in a token list.
+    If a token is the name of a tuple alias, replace it with the alias parts.
+    Single-value alias names and literal values are left as-is.
+    """
+    result = []
+    for v in vals:
+        if v in _aliases and isinstance(_aliases[v], list):
+            result.extend(_aliases[v])
+        else:
+            result.append(v)
+    return result
+
+
+def _load_aliases():
+    """Load aliases.txt into _aliases. Called once after parse_brackets is defined."""
+    try:
+        with open("ultrasetup/aliases.txt") as _af:
+            for _line in _af:
+                _line = _line.strip()
+                if not _line or _line.startswith(";"):
+                    continue
+                if "=" in _line:
+                    _ak, _, _av = _line.partition("=")
+                    _ak = _ak.strip()
+                    _av = _av.partition(";")[0].strip()
+                    if "[" in _av:
+                        _aliases[_ak] = _expand_aliases(parse_brackets(_av))
+                    else:
+                        try:
+                            _aliases[_ak] = int(_av)
+                        except ValueError:
+                            pass
+    except OSError:
+        pass
+
+
+_load_aliases()
+
+
 def _expand_repeat(vals):
     """Expand [*] tokens: each [*] repeats the previous token value.
     [*] with no prior value resolves to None (treated as empty by callers).
@@ -95,7 +119,7 @@ def parse_commands(s):
         part = part.strip()
         if not part:
             continue
-        vals = parse_brackets(part)
+        vals = _expand_aliases(parse_brackets(part))
         if not vals:
             continue
         while len(vals) < 4:
@@ -243,7 +267,7 @@ def load_page(page_num, config_name=None):
             k, _, v = line.partition("=")
             k    = k.strip()
             v    = v.strip()
-            vals = parse_brackets(v)
+            vals = _expand_aliases(parse_brackets(v))
 
             # ---- [global] section (always parsed) ------------------------
             if current_section == "global":
