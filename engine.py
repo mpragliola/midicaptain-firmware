@@ -48,7 +48,7 @@ def _run_as_key(key_idx, cmds):
 def _update_sub_color(key_idx, led_triple):
     """Set pending sublabel background color from an LED color triple."""
     fc = S._first_non_null_color(led_triple)
-    S._pending_sub_colors[key_idx] = _color_int(fc) if fc else -1
+    S.disp.set_sub_color(key_idx, _color_int(fc) if fc else -1)
 
 
 def set_key_leds(key_idx, colors):
@@ -122,7 +122,7 @@ def _exec_one_command(cmd):
             print("[CMD] {} | KEY {} step={} lstep={}".format(_dbg_key(), S._key_name(key_num), c, d))
         if 0 <= key_num < S.NUM_TOTAL_KEYS and key_num != S._active_key:
             page = S.current_page
-            kc_key = page.get_key(key_num)
+            kc_key = page.keys[key_num]
             if c and c != "-":
                 target_step = int(c) - 1
                 page.set_cycle_pos(key_num, (target_step - 1) % max(1, kc_key["cycle"]))
@@ -179,116 +179,19 @@ def _exec_one_command(cmd):
 
 def apply_page():
     """Reset all key state, LEDs and display for the current page cfg."""
-    # Apply global brightness settings from config
-    S.pixels.brightness    = max(0.0, min(1.0, S.current_page.led_brightness / 100))
-    S.backlight.duty_cycle = int(max(0, min(100, S.current_page.screen_brightness)) / 100 * 65535)
+    page = S.current_page
 
-    S.current_page.reset()
+    # Hardware brightness
+    S.pixels.brightness = max(0.0, min(1.0, page.led_brightness / 100))
+    S.disp.set_brightness(page.screen_brightness)
+
+    page.reset()
     for i in range(S.NUM_PHYSICAL_KEYS):
         clear_key_leds(i)
     S.pixels.show()
 
-    # Apply page_label colors and full-width background bar
-    S.page_label.color = S.current_page.color
-    bg = S.current_page.bgcolor
-    if bg is not None:
-        S._page_bar_palette[0] = bg
-        S._page_bar_palette.make_opaque(0)
-    else:
-        S._page_bar_palette.make_transparent(0)
-
-    # Queue display update
-    S._pending_page = S.current_page.name
-
-    # --- Visualization layout ---
-    ml_size = S.current_page.vis_mainlabel_size
-    n_subs  = S.current_page.vis_sublabels
-    sat, ch, num_rows, sub_font, sub_scale, mc = S._compute_vis_layout(ml_size, n_subs)
-    S._vis_sublabels     = n_subs
-    S._vis_sub_max_chars = mc
-    if S.DEBUG:
-        print("[VIS] ml_size={} n_subs={} sat={} ch={} mc={}".format(ml_size, n_subs, sat, ch, mc))
-
-    # Main label: recreate with the right font, or hide for size=0
-    S._pending_status = None
-    main_font = S._VIS_MAIN_FONT[ml_size]
-    if main_font is None:
-        S.status_label = S._lmod.Label(S.FONT_STATUS, text="", color=0xFFFFFF,
-                                       scale=1, line_spacing=0.9,
-                                       anchor_point=(0.5, 0),
-                                       anchored_position=(999, 999))
-    else:
-        S.status_label = S._lmod.Label(main_font, text="", color=0xFFFFFF,
-                                       scale=1, line_spacing=0.9,
-                                       anchor_point=(0.5, 0),
-                                       anchored_position=(S.display.width // 2,
-                                                          S._VIS_MAIN_LABEL_Y[ml_size]))
-    S.splash[1] = S.status_label
-
-    # Rebuild sublabel bitmap if cell height changed
-    if ch != S._vis_sub_cell_h:
-        S._vis_sub_cell_h = ch
-        S._sub_cell_h     = ch
-        S._sub_bar_bitmap = displayio.Bitmap(S._SUB_CELL_W, ch, 1)
-
-    # Rebuild _sub_group with exactly n_subs tile+label pairs
-    while len(S._sub_group):
-        S._sub_group.pop()
-    S._sub_bar_tiles.clear()
-    S._sub_labels.clear()
-    for i in range(n_subs):
-        _nt = displayio.TileGrid(S._sub_bar_bitmap, pixel_shader=S._sub_bar_palettes[i],
-                                 x=999, y=999)
-        S._sub_bar_tiles.append(_nt)
-        S._sub_group.append(_nt)
-    for i in range(n_subs):
-        _nl = S._lmod.Label(sub_font, text="", color=0xFFFFFF,
-                            scale=sub_scale, line_spacing=0.9,
-                            anchor_point=(0.5, 0.5),
-                            anchored_position=(999, 999))
-        S._sub_labels.append(_nl)
-        S._sub_group.append(_nl)
-
-    # Position active sublabel slots
-    for i in range(n_subs):
-        if S.current_page.keys[i]["stompmode"] > 0:
-            col = i % 3
-            row = i // 3
-            ry  = sat + ch // 2 + row * ch
-            S._sub_bar_tiles[i].x = col * 80 + (80 - S._SUB_CELL_W) // 2
-            S._sub_bar_tiles[i].y = ry - ch // 2
-            S._sub_labels[i].anchored_position = (S._SUB_GRID_X[col], ry)
-        S._sub_bar_palettes[i].make_transparent(0)
-        S._pending_subs[i] = ""
-
-    S.display_dirty = True
-
-
-def _show_page_errors(errs, page_num):
-    """Override display to show page validation errors in plain terminal font."""
-    # Red page bar, white text
-    S._page_bar_palette[0] = 0xCC2200
-    S._page_bar_palette.make_opaque(0)
-    S.page_label.color = 0xFFFFFF
-    S._pending_page = "P{}:ERR".format(page_num)
-
-    # Hide sublabels — errors don't use the performance grid
-    for i in range(len(S._sub_bar_palettes)):
-        S._sub_bar_palettes[i].make_transparent(0)
-    for i in range(len(S._sub_labels)):
-        S._sub_labels[i].text = ""
-
-    # Show all errors as plain terminal-font text below the page bar
-    txt = "\n".join(errs[:8])
-    S.status_label = S._lmod.Label(
-        terminalio.FONT, text=txt, color=0xFFFFFF,
-        scale=2, line_spacing=1.2,
-        anchor_point=(0.5, 0),
-        anchored_position=(S.display.width // 2, 30),
-    )
-    S.splash[1] = S.status_label
-
-    S.display_dirty = True
+    # All display work delegated to Display
+    S.disp.apply_vis(page)
 
 
 def switch_page(page_num):
@@ -298,7 +201,7 @@ def switch_page(page_num):
     S.current_page = Page(page_num)
     apply_page()
     if S.current_page.errors:
-        _show_page_errors(S.current_page.errors, page_num)
+        S.disp.show_errors(S.current_page.errors, page_num)
     else:
         exec_commands(S.current_page.init_commands)
     S._page_switched = True
@@ -312,7 +215,7 @@ def press_key(key_idx):
     """Handle a confirmed short press on key_idx."""
     S._page_switched = False
     page         = S.current_page
-    kc           = page.get_key(key_idx)
+    kc           = page.keys[key_idx]
     group        = kc["group"]
     leds         = kc["leds"]
     labels       = kc["labels"]
@@ -322,14 +225,14 @@ def press_key(key_idx):
         prev_active       = page.get_group_active(group)
         group_cycle_reset = page.group_cycle.get(group, False)
         for i in range(S.NUM_TOTAL_KEYS):
-            if i != key_idx and page.get_key(i)["group"] == group:
+            if i != key_idx and page.keys[i]["group"] == group:
                 if i < S.NUM_PHYSICAL_KEYS:
                     clear_key_leds(i)
                 page.set_cycle_pos(i, -1)
                 page.set_long_cycle_pos(i, -1)
-                if i < S._vis_sublabels and page.get_key(i)["stompmode"] > 0:
-                    S._pending_subs[i] = ""
-                    S._pending_sub_colors[i] = -1
+                if i < S.disp._vis_sublabels and page.keys[i]["stompmode"] > 0:
+                    S.disp.set_sub(i, "")
+                    S.disp.set_sub_color(i, -1)
         if group_cycle_reset and prev_active != key_idx:
             page.set_cycle_pos(key_idx, -1)
         page.set_group_active(group, key_idx)
@@ -351,27 +254,27 @@ def press_key(key_idx):
 
         labels_d = kc["labels_d"]
         if step < len(labels) and labels[step]:
-            S._pending_status = labels[step]
+            S.disp.set_status(labels[step])
         elif key_idx < S.NUM_PHYSICAL_KEYS and not labels_d:
-            S._pending_status = S.KEY_NAMES[key_idx]
+            S.disp.set_status(S.KEY_NAMES[key_idx])
 
-        sm = kc["stompmode"] if key_idx < S._vis_sublabels else 0
+        sm = kc["stompmode"] if key_idx < S.disp._vis_sublabels else 0
         if sm == 1:
             lbl = labels[step] if step < len(labels) else ""
-            S._pending_subs[key_idx] = lbl
+            S.disp.set_sub(key_idx, lbl)
             _update_sub_color(key_idx, leds[step] if step < len(leds) else [])
         elif sm == 2 and kc["longcycle"] > 0:
             lstep = page.get_long_cycle_pos(key_idx)
             labels_l = kc["labels_l"]
-            S._pending_subs[key_idx] = labels_l[lstep] if 0 <= lstep < len(labels_l) else ""
+            S.disp.set_sub(key_idx, labels_l[lstep] if 0 <= lstep < len(labels_l) else "")
 
-        S.display_dirty = True
+        S.disp.mark_dirty()
 
 
 def longpress_key(key_idx):
     """Handle a confirmed long press on key_idx."""
     page      = S.current_page
-    kc        = page.get_key(key_idx)
+    kc        = page.keys[key_idx]
     longcycle = kc["longcycle"]
     longgroup = kc["longgroup"]
 
@@ -381,15 +284,15 @@ def longpress_key(key_idx):
             prev_active = page.get_group_active_long(longgroup)
             if prev_active is not None and prev_active != key_idx:
                 if prev_active < S.NUM_PHYSICAL_KEYS:
-                    prev_kc = page.get_key(prev_active)
+                    prev_kc = page.keys[prev_active]
                     prev_step = page.get_cycle_pos(prev_active)
                     prev_leds = prev_kc["leds"]
                     if prev_step >= 0 and prev_step < len(prev_leds):
                         set_key_leds(prev_active, prev_leds[prev_step])
                 page.set_long_cycle_pos(prev_active, -1)
-                if prev_active < S._vis_sublabels:
-                    S._pending_subs[prev_active] = ""
-                    S._pending_sub_colors[prev_active] = -1
+                if prev_active < S.disp._vis_sublabels:
+                    S.disp.set_sub(prev_active, "")
+                    S.disp.set_sub_color(prev_active, -1)
             if prev_active != key_idx:
                 page.set_long_cycle_pos(key_idx, -1)
             page.set_group_active_long(longgroup, key_idx)
@@ -405,17 +308,17 @@ def longpress_key(key_idx):
             set_key_leds(key_idx, leds_l[lstep])
             S.pixels.show()
 
-        if key_idx < S._vis_sublabels:
+        if key_idx < S.disp._vis_sublabels:
             labels_l = kc["labels_l"]
             if lstep < len(labels_l):
-                S._pending_subs[key_idx] = labels_l[lstep]
+                S.disp.set_sub(key_idx, labels_l[lstep])
             if lstep < len(leds_l):
                 _update_sub_color(key_idx, leds_l[lstep])
     else:
         cmd_step = max(1, page.get_cycle_pos(key_idx) + 1)
 
     _run_as_key(key_idx, kc["commands"].get((cmd_step, "ldn"), []))
-    S.display_dirty = True
+    S.disp.mark_dirty()
 
 
 def release_key(key_idx, long_press=False):
@@ -423,7 +326,7 @@ def release_key(key_idx, long_press=False):
     if S._page_switched:
         return
     page      = S.current_page
-    kc        = page.get_key(key_idx)
+    kc        = page.keys[key_idx]
     longcycle = kc["longcycle"]
 
     if long_press:
@@ -469,7 +372,7 @@ def process_capture_cc(channel, control, value):
     elif action == 3:
         release_key(key_idx, long_press=True)
 
-    S.display_dirty = True
+    S.disp.mark_dirty()
     return True
 
 
@@ -482,9 +385,9 @@ def process_capture_cc(channel, control, value):
 # computer.
 #
 # Display isolation: Explorer Mode creates its own displayio.Group and swaps it
-# in via S.display.show(grp).  The performance display (S.splash) is untouched
-# while explorer is active.  On exit or confirm, S.display.show(S.splash)
-# restores performance mode.
+# in via S.disp.show(grp).  The performance display (S.disp.splash) is untouched
+# while explorer is active.  On exit or confirm, S.disp.restore() restores
+# performance mode.
 #
 # LED feedback: each key gets a role-colored LED (purple=nav, cyan=page,
 # red=cancel, green=confirm).  LEDs are dim at idle and brighten on press.
@@ -505,7 +408,7 @@ def switch_config(name):
     S.current_page = Page(0)
     S.pixels.fill((0, 0, 0))
     S.pixels.show()
-    S.display.show(S.splash)       # restore performance display group
+    S.disp.restore()
     apply_page()
     exec_commands(S.current_page.init_commands)
     S._page_switched = True
@@ -593,7 +496,7 @@ def enter_explorer():
 
     The cursor starts on the currently active config.  All 6 physical
     LEDs are set to their role color at dim intensity.  The explorer
-    group replaces S.splash via S.display.show().
+    group replaces S.disp.splash via S.disp.show().
     """
     configs = list_configs()
 
@@ -609,25 +512,25 @@ def enter_explorer():
     # --- Build the explorer display group (plain Labels, no tiles) ---
     grp = displayio.Group()
 
-    title = S._lmod.Label(S.FONT_SUBGRID, text="SELECT CONFIG",
-                          color=0xFFFFFF, anchor_point=(0.5, 0.0),
-                          anchored_position=(120, 4))
+    title = S.disp._lmod.Label(S.disp.font_subgrid, text="SELECT CONFIG",
+                               color=0xFFFFFF, anchor_point=(0.5, 0.0),
+                               anchored_position=(120, 4))
     grp.append(title)
 
-    up_lbl = S._lmod.Label(terminalio.FONT, text=" ", color=0x888888, scale=2,
-                           anchor_point=(0.5, 0.0), anchored_position=(120, 36))
+    up_lbl = S.disp._lmod.Label(terminalio.FONT, text=" ", color=0x888888, scale=2,
+                                anchor_point=(0.5, 0.0), anchored_position=(120, 36))
     grp.append(up_lbl)
 
     item_lbls = []
     for slot in range(6):
-        lbl = S._lmod.Label(S.FONT_SUBGRID, text="", color=0x666666,
-                            anchor_point=(0.0, 0.0),
-                            anchored_position=(4, 56 + slot * 28))
+        lbl = S.disp._lmod.Label(S.disp.font_subgrid, text="", color=0x666666,
+                                 anchor_point=(0.0, 0.0),
+                                 anchored_position=(4, 56 + slot * 28))
         grp.append(lbl)
         item_lbls.append(lbl)
 
-    dn_lbl = S._lmod.Label(terminalio.FONT, text=" ", color=0x888888, scale=2,
-                           anchor_point=(0.5, 0.0), anchored_position=(120, 222))
+    dn_lbl = S.disp._lmod.Label(terminalio.FONT, text=" ", color=0x888888, scale=2,
+                                anchor_point=(0.5, 0.0), anchored_position=(120, 222))
     grp.append(dn_lbl)
 
     # Store references on state for access by _explorer_render / explorer_key
@@ -647,15 +550,15 @@ def enter_explorer():
     S.pixels.show()
 
     # Swap display to explorer group, render the list, push to screen
-    S.display.show(grp)
+    S.disp.show(grp)
     _explorer_render()
-    S.display.refresh()
+    S.disp.refresh()
 
 
 def exit_explorer():
     """Leave Explorer Mode without changing config (cancel).
 
-    Clears all explorer state, resets LEDs to black, restores S.splash
+    Clears all explorer state, resets LEDs to black, restores S.disp.splash
     as the active display group, and re-applies the current page layout
     (LEDs, labels, init_commands) so performance mode is fully restored.
     """
@@ -667,7 +570,7 @@ def exit_explorer():
     S._explorer_configs   = None
     S.pixels.fill((0, 0, 0))
     S.pixels.show()
-    S.display.show(S.splash)
+    S.disp.restore()
     apply_page()
     exec_commands(S.current_page.init_commands)
 
@@ -734,4 +637,4 @@ def explorer_key(key_idx):
     S.pixels.show()
     # Re-render the list with updated cursor/scroll and push to display
     _explorer_render()
-    S.display.refresh()
+    S.disp.refresh()

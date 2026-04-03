@@ -1,13 +1,14 @@
 # =============================================================================
 # UltraMidi firmware — main entry point
 # written by mpragliola <marcopragliola@gmail.com>
-# 
+#
 # Runs on a MidiCaptain Mini 6 (RP2040 / CircuitPython 7.3.1).
 # Reads config from ultrasetup/<name>.txt, manages 6 footswitches,
 # 18 NeoPixel LEDs (3 per switch), a 240×240 ST7789 display and dual MIDI out
 # (USB-MIDI + classic DIN-5 via UART).
 # =============================================================================
 
+import gc
 import time
 import microcontroller
 import usb_midi as _usb_midi
@@ -30,11 +31,12 @@ except ImportError:
 from adafruit_st7789 import ST7789
 
 import state as S
-from config import list_configs     # list_configs: discover config .txt files
+from config import list_configs
 from pages import Page
+from display import Display
 from engine import (exec_commands, apply_page, switch_page,
                     switch_config, enter_explorer, exit_explorer, explorer_key,
-                    explorer_press,                 # LED feedback on key press in explorer
+                    explorer_press,
                     press_key, longpress_key, release_key,
                     process_capture_cc)
 
@@ -42,98 +44,40 @@ from engine import (exec_commands, apply_page, switch_page,
 # FONTS
 # =============================================================================
 from adafruit_bitmap_font import bitmap_font as _bf
-S.FONT_STATUS  = _bf.load_font("fonts/bahnschrift_48.pcf")
-S.FONT_PAGE    = terminalio.FONT
-S.FONT_SUB     = _bf.load_font("fonts/bahnschrift_32.pcf")
-S.FONT_SUBGRID = _bf.load_font("fonts/bahnschrift_24.pcf")
-S.FONT_BIG     = _bf.load_font("fonts/bahnschrift_64.pcf")
-
-S._VIS_MAIN_FONT = [None, S.FONT_SUBGRID, S.FONT_SUB, S.FONT_STATUS, S.FONT_BIG]
-S._lmod = _lmod
+_font_status  = _bf.load_font("fonts/bahnschrift_48.pcf")
+_font_page    = terminalio.FONT
+_font_sub     = _bf.load_font("fonts/bahnschrift_32.pcf")
+_font_subgrid = _bf.load_font("fonts/bahnschrift_24.pcf")
+_font_big     = _bf.load_font("fonts/bahnschrift_64.pcf")
 
 # =============================================================================
 # DISPLAY  (ST7789, 240×240, SPI)
 # =============================================================================
 displayio.release_displays()
 
-S.backlight = pwmio.PWMOut(board.GP8)
-S.backlight.duty_cycle = 0
+_backlight = pwmio.PWMOut(board.GP8)
+_backlight.duty_cycle = 0
 
 spi         = busio.SPI(board.GP14, board.GP15)
 display_bus = displayio.FourWire(spi, command=board.GP12, chip_select=board.GP13,
                                   baudrate=62_500_000)
-S.display   = ST7789(display_bus, width=240, height=240, rowstart=80, rotation=180,
+_hw_display = ST7789(display_bus, width=240, height=240, rowstart=80, rotation=180,
                      auto_refresh=False)
 
-S.splash = displayio.Group()
-S.display.show(S.splash)
-
-# Background layer — always at splash[0]
-_bg_bitmap  = displayio.Bitmap(S.display.width, S.display.height, 1)
-_bg_palette = displayio.Palette(1)
-_bg_palette[0] = 0x000000
-_bg_tile = displayio.TileGrid(_bg_bitmap, pixel_shader=_bg_palette)
-S.splash.append(_bg_tile)
-_bg_file = None
-
-# Main status label
-S.status_label = _lmod.Label(
-    S.FONT_STATUS,
-    text="",
-    color=0xFFFFFF,
-    scale=1,
-    line_spacing=0.9,
-    anchor_point=(0.5, 0),
-    anchored_position=(S.display.width // 2, 43),
+gc.collect()
+S.disp = Display(
+    _hw_display,
+    _backlight,
+    _lmod,
+    {
+        "status":  _font_status,
+        "page":    _font_page,
+        "sub":     _font_sub,
+        "subgrid": _font_subgrid,
+        "big":     _font_big,
+    }
 )
-S.splash.append(S.status_label)
-
-# Sub-grid
-S._sub_bar_bitmap = displayio.Bitmap(S._SUB_CELL_W, S._sub_cell_h, 1)
-S._sub_bar_palettes = []
-S._sub_bar_tiles = []
-for _si in range(12):
-    _sp = displayio.Palette(1)
-    _sp[0] = 0x000000
-    _sp.make_transparent(0)
-    S._sub_bar_palettes.append(_sp)
-
-S._sub_labels = []
-S._sub_group = displayio.Group()
-
-for _si in range(6):
-    _st = displayio.TileGrid(S._sub_bar_bitmap, pixel_shader=S._sub_bar_palettes[_si], x=999, y=999)
-    S._sub_bar_tiles.append(_st)
-    S._sub_group.append(_st)
-for _si in range(6):
-    _sl = _lmod.Label(
-        S.FONT_SUBGRID, text="", color=0xFFFFFF, scale=1,
-        anchor_point=(0.5, 0.5), anchored_position=(999, 999),
-    )
-    S._sub_labels.append(_sl)
-    S._sub_group.append(_sl)
-
-S.splash.append(S._sub_group)
-
-# Page name bar
-_page_bar_bitmap  = displayio.Bitmap(S.display.width, 28, 1)
-S._page_bar_palette = displayio.Palette(1)
-S._page_bar_palette[0] = 0x000000
-S._page_bar_palette.make_transparent(0)
-_page_bar_tile = displayio.TileGrid(_page_bar_bitmap, pixel_shader=S._page_bar_palette)
-S.splash.append(_page_bar_tile)
-
-# Page name label
-S.page_label = _lmod.Label(
-    S.FONT_PAGE,
-    text="",
-    color=0xf84848,
-    scale=2,
-    anchor_point=(0.5, 0.0),
-    anchored_position=(S.display.width // 2, 0),
-)
-S.splash.append(S.page_label)
-
+gc.collect()
 
 # =============================================================================
 # NEOPIXELS
@@ -185,8 +129,6 @@ except (IndexError, AttributeError, ValueError) as e:
 # --- Config discovery ---
 # Scan ultrasetup/ for config .txt files (e.g. init.txt, live_rig.txt).
 # Prefer "init" if it exists, otherwise pick the first alphabetically.
-# If no configs exist, cfg_name stays "init" and load_page will
-# return a default empty config (the file simply won't be found).
 _startup_cfgs = list_configs()
 if "init" in _startup_cfgs:
     S.cfg_name = "init"
@@ -195,16 +137,17 @@ elif _startup_cfgs:
 S.current_page = Page(S.page_cur)
 
 # Apply background once — loaded from [global] section, never changed on page switches
-_bg_img = S.current_page.background_image
+_bg_file = None
+_bg_img  = S.current_page.background_image
 if _bg_img:
     try:
         _bg_file = open("wallpaper/{}.bmp".format(_bg_img), "rb")
         _bmp = displayio.OnDiskBitmap(_bg_file)
-        S.splash[0] = displayio.TileGrid(_bmp, pixel_shader=_bmp.pixel_shader)
+        S.disp.set_background_image(_bmp, _bg_file)
     except OSError:
-        _bg_palette[0] = S.current_page.background_int
+        S.disp.set_background_color(S.current_page.background_int)
 else:
-    _bg_palette[0] = S.current_page.background_int
+    S.disp.set_background_color(S.current_page.background_int)
 
 apply_page()
 exec_commands(S.current_page.init_commands)
@@ -352,29 +295,8 @@ async def key_check():
 async def disp_task():
     """Display refresh task — applies pending text/color changes."""
     while True:
-        if S.display_dirty:
-            S.display_dirty = False
-            if S._pending_page is not None:
-                S.page_label.text = S._pending_page
-                S._pending_page   = None
-            if S._pending_status is not None:
-                S.status_label.text = S._pending_status.replace(":", "\n")
-                S._pending_status   = None
-            for _si in range(S._vis_sublabels):
-                if S._pending_subs[_si] is not None:
-                    S._sub_labels[_si].text = S._pending_subs[_si][:S._vis_sub_max_chars]
-                    S._pending_subs[_si] = None
-                if S._pending_sub_colors[_si] is not None:
-                    if S._pending_sub_colors[_si] == -1:
-                        S._sub_bar_palettes[_si].make_transparent(0)
-                    else:
-                        _c = S._pending_sub_colors[_si]
-                        S._sub_bar_palettes[_si][0] = _c
-                        S._sub_bar_palettes[_si].make_opaque(0)
-                        _r = (_c >> 16) & 0xFF; _g = (_c >> 8) & 0xFF; _b = _c & 0xFF
-                        S._sub_labels[_si].color = 0x000000 if (_r * 299 + _g * 587 + _b * 114) > 128000 else 0xFFFFFF
-                    S._pending_sub_colors[_si] = None
-            S.display.refresh()
+        if S.disp._dirty:
+            S.disp.flush()
         await asyncio.sleep(0)
 
 
