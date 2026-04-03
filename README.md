@@ -74,7 +74,9 @@ it in command declarations: `[hxstomp_chan][PC][2]`. If one day you decide to ch
 the receiving channel on the target device, you will have to change the configuration
 only in one place.
 
-#### 2. Use aliases as mappings
+You can also use aliases as mnemonics for **colors**. The `aliases.txt` files already defines useful color constants prefixed by `C_*`.
+
+#### 2. Use aliases as MIDI mappings
 
 Most of the times your target device(s) will feature a **MIDI implementation chart**,
 with the specific commands (usually CC#) and values needed to control functionality.
@@ -86,22 +88,24 @@ For example, if I have a Line6 HX Stomp, the mapping tells mne that FootSwitch 1
 mapped to CC#49. I can define an alias:;
 
 ```
-line6hxstomp_fs1 = 49   ; Footswitch 1  (0-127)
+line6hxstomp_fs1 = 49
 ```
 
-and use it in command declarations:
+and reuse it in command declarations:
 
 ```
 init_commands = [1][CC][line6hxstomp_fs1][127]
 ```
 
-### Caveats
+### Caveats on alias use
 
-The substitutions are "stupid" and purely based on text matching and substitution,
-so **make sure your alias name is alphanumeric and unique enough**. 
-This will avoid ambiguities with existing commands (e.g. don't use `PAGE` as alias)
-and among similar functions on different of your target devices.
-A good strategy is to use prefixes, like `line6hxstomp_*` above.
+The substitutions are "stupid" and purely based on plain text matching, therefore it's strongly advised to follow these best practices to not confuse the config parser, making sure that your alias:
+
+* is **alphanumeric**
+* does not overlap with existing commands (avoid aliases like `PAGE` or `CMD`)
+* does not overwrite previous aliases 
+
+To avoid ambiguities a good practice is to **use a prefix scheme**: use `xyz_PAGE` or `xyz_CMD`, and use product-specific prefixes like `line6hxstomp_*` for product-specific mappings. 
 
 ## Cycle steps
 

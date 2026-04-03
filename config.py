@@ -95,9 +95,12 @@ def parse_led_color(s):
     s = s.strip()
     if s == "" or s == "-":
         return None
-    if s.startswith("0x") or s.startswith("0X"):
-        s = s[2:]
-    v = int(s, 16)
+    if s in _aliases:
+        v = _aliases[s]
+    else:
+        if s.startswith("0x") or s.startswith("0X"):
+            s = s[2:]
+        v = int(s, 16)
     return ((v >> 16) & 0xFF, (v >> 8) & 0xFF, v & 0xFF)
 
 
@@ -106,6 +109,8 @@ def parse_color_int(s):
     s = s.strip()
     if s == "" or s == "-":
         return 0
+    if s in _aliases:
+        return _aliases[s]
     if s.startswith("0x") or s.startswith("0X"):
         return int(s[2:], 16)
     return int(s, 16)

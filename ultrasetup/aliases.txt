@@ -1,9 +1,24 @@
 ; =============================================================================
-; aliases.txt — named aliases for MIDI CC / PC / note numbers
-; Used in page config as: [1][CC][tx_gain][64]
+; aliases.txt — named aliases for MIDI CC / PC / note numbers and colors
+; Used in page config as: [1][CC][tx_gain][64] or [C_RED][C_RED][]
 ; Format:  alias = number
 ; Lines starting with ; are comments.
 ; =============================================================================
+
+; --- Color palette (12 distinct hues + white) --------------------------------
+C_RED     = 0xFF0000
+C_ORANGE  = 0xFF6600
+C_YELLOW  = 0xFFFF00
+C_LIME    = 0x80FF00
+C_GREEN   = 0x00FF00
+C_MINT    = 0x00FF80
+C_CYAN    = 0x00FFFF
+C_BLUE    = 0x0000FF
+C_PURPLE  = 0x8000FF
+C_MAGENTA = 0xFF00FF
+C_PINK    = 0xFF0080
+C_WHITE   = 0xFFFFFF
+C_BLACK   = 0x000000
 
 ; --- AmpliTube TONEX Pedal — global controls ---------------------------------
 tx_preset_on  = 12   ; Preset on/off  (0=off  127=on)

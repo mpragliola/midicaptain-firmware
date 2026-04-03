@@ -46,7 +46,7 @@ page_name = [MAIN PAGE]
 
 ; background color of the page name label
 color = [0x000000]
-bgcolor = [0xff0000]
+bgcolor = [C_RED]
 
 ; init_commands is the list of commands executed when the page is loaded.
 ; Use [KEY][n][c][lc] to simulate pressing a key on page load (replaces init_key).
@@ -112,11 +112,11 @@ stompmode = [2]
 ; a null color ([] or [-]) means the LED is unchanged.
 ; black color (0x000000) means the LED is off.
 ; ledXl is the same for the long press cycle step.
-led1 = [0x00ff00][-][0x00ff00]
-led2 = [0x0000ff][-][0x0000ff]
-led3 = [0x0000ff][-][0x00ff00]
-led1l = [-][0xffffff][-]
-led2l = [-][0xff00ff][-]
+led1 = [C_GREEN][-][C_GREEN]
+led2 = [C_BLUE][-][C_BLUE]
+led3 = [C_BLUE][-][C_GREEN]
+led1l = [-][C_WHITE][-]
+led2l = [-][C_MAGENTA][-]
 
 ; labelX is the text on the key per cycle step. X is the cycle step number.
 ; use label1 when there's no cycle. A colon (:) in the label creates a line
@@ -153,21 +153,21 @@ key2ldn = [1][CC][7][127]
 [key1]
 group = [1]
 cycle = [2]
-led1 = [0x00ff00][0x00ffff][0x00ffff]
-led2 = [0x0000ff][0x00ffff][0x0000ff]
+led1 = [C_GREEN][C_CYAN][C_CYAN]
+led2 = [C_BLUE][C_CYAN][C_BLUE]
 
 [key2]
 group = [2]
-led1 = [0x00ff00][0x00ffff][0x00ffff]
+led1 = [C_GREEN][C_CYAN][C_CYAN]
 
 [key3]
 group = [2]
-led1 = [0x00ff00][0x00ffff][0x00ffff]
+led1 = [C_GREEN][C_CYAN][C_CYAN]
 
 [key4]
 cycle = [2]
-led1 = [0x000000][0x000000][0x00ffff]
-led2 = [0x00ff00][0x00ffff][0x00ffff]
+led1 = [0x000000][0x000000][C_CYAN]
+led2 = [C_GREEN][C_CYAN][C_CYAN]
 key1dn = [1][CC][4][0]
 key2dn = [1][CC][4][127]
 ; if you don't want the main label to change, you can
@@ -229,7 +229,7 @@ key2dn = [1][CC][2][0]
 [page]
 page_name = [PAGE 2]
 color = [0x000000]
-bgcolor = [0x0000ff]
+bgcolor = [C_BLUE]
 
 [key5]
 key1dn = [PAGE][0]
