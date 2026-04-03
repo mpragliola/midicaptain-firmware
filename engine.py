@@ -7,6 +7,7 @@ from adafruit_midi.note_on import NoteOn
 import state as S
 import terminalio
 from config import load_page, list_configs, _resolve
+from pages import Page
 
 
 # =============================================================================
@@ -178,11 +179,12 @@ def _exec_one_command(cmd):
 def apply_page():
     """Reset all key state, LEDs and display for the current page cfg."""
     # Apply global brightness settings from config
-    S.pixels.brightness    = max(0.0, min(1.0, S.cfg["led_brightness"] / 100))
-    S.backlight.duty_cycle = int(max(0, min(100, S.cfg["screen_brightness"])) / 100 * 65535)
+    S.pixels.brightness    = max(0.0, min(1.0, S.current_page.led_brightness / 100))
+    S.backlight.duty_cycle = int(max(0, min(100, S.current_page.screen_brightness)) / 100 * 65535)
 
     S.group_active = {}
     S.long_group_active = {}
+    S.current_page.reset()
     for i in range(S.NUM_TOTAL_KEYS):
         S.cycle_pos[i]      = -1
         S.long_cycle_pos[i] = -1
@@ -297,7 +299,8 @@ def switch_page(page_num):
     """Load a new page config, reset state, and run init commands."""
     S._page_switched = False
     S.page_cur = page_num
-    S.cfg      = load_page(page_num)
+    S.current_page = Page(page_num)
+    S.cfg = S.current_page.cfg
     apply_page()
     if S.cfg["page_errors"]:
         _show_page_errors(S.cfg["page_errors"], page_num)

@@ -19,6 +19,7 @@ RELOAD_COMBO    = (0, 2)
 # Runtime state
 page_cur       = 0
 cfg            = None
+current_page   = None  # Page object (from pages.py); encapsulates page state and config
 cycle_pos      = [-1] * NUM_TOTAL_KEYS
 long_cycle_pos = [-1] * NUM_TOTAL_KEYS
 group_active   = {}

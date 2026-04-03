@@ -1,5 +1,7 @@
 # =============================================================================
 # UltraMidi firmware — main entry point
+# written by mpragliola <marcopragliola@gmail.com>
+# 
 # Runs on a MidiCaptain Mini 6 (RP2040 / CircuitPython 7.3.1).
 # Reads config from ultrasetup/<name>.txt, manages 6 footswitches,
 # 18 NeoPixel LEDs (3 per switch), a 240×240 ST7789 display and dual MIDI out
@@ -29,6 +31,7 @@ from adafruit_st7789 import ST7789
 
 import state as S
 from config import load_page, list_configs     # list_configs: discover config .txt files
+from pages import Page
 from engine import (exec_commands, apply_page, switch_page,
                     switch_config, enter_explorer, exit_explorer, explorer_key,
                     explorer_press,                 # LED feedback on key press in explorer
@@ -189,7 +192,8 @@ if "init" in _startup_cfgs:
     S.cfg_name = "init"
 elif _startup_cfgs:
     S.cfg_name = _startup_cfgs[0]
-S.cfg = load_page(S.page_cur)
+S.current_page = Page(S.page_cur)
+S.cfg = S.current_page.cfg
 
 # Apply background once — loaded from [global] section, never changed on page switches
 _bg_img = S.cfg.get("page_bg_img")
