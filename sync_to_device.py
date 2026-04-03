@@ -1,10 +1,11 @@
 """
-Sync E:/dev/ultramidi (git repo) -> G: (CircuitPython device)
-Watches for file changes on E: and deploys them to G:.
+Sync git repo -> CircuitPython device
+Watches for file changes and deploys them automatically.
 
 Usage:
   python sync_to_device.py          # watch mode (continuous)
   python sync_to_device.py --once   # one-shot sync
+  python sync_to_device.py --debug  # debug device discovery
 """
 
 import sys
@@ -12,19 +13,66 @@ import os
 import time
 import shutil
 import hashlib
-import configparser
 from pathlib import Path
 
-_cfg = configparser.ConfigParser()
-_cfg_path = Path(__file__).parent / "sync_config.ini"
-if not _cfg_path.is_file():
-    print(f"Config not found: {_cfg_path}")
-    print("Copy sync_config.ini.example to sync_config.ini and edit it.")
-    sys.exit(1)
-_cfg.read(_cfg_path)
+DEBUG = "--debug" in sys.argv
+SRC = Path(__file__).parent
 
-SRC = Path(_cfg["paths"]["src"])
-DST = Path(_cfg["paths"]["dst"])
+
+def find_device():
+    """Scan all drives for CircuitPython device (boot_out.txt present)."""
+    devices = []
+    try:
+        # Windows: scan all drive letters
+        for drive_letter in "ABCDEFGHIJKLMNOPQRSTUVWXYZ":
+            drive = Path(f"{drive_letter}:/")
+            if not drive.exists():
+                continue
+            boot_out = drive / "boot_out.txt"
+            if boot_out.is_file():
+                if DEBUG:
+                    print(f"[DEBUG] Found device: {drive}")
+                devices.append(drive)
+            elif DEBUG:
+                print(f"[DEBUG] Scanned {drive} - no boot_out.txt")
+    except Exception as e:
+        if DEBUG:
+            print(f"[DEBUG] Scan error: {e}")
+    if DEBUG:
+        print(f"[DEBUG] Device discovery complete: {len(devices)} device(s) found")
+    return devices
+
+
+def get_device():
+    """Get the CircuitPython device path, prompting if multiple found."""
+    devices = find_device()
+    if not devices:
+        print("Error: CircuitPython device not found.")
+        print("Ensure it's connected and mounted as a USB drive.")
+        sys.exit(1)
+    if len(devices) == 1:
+        if DEBUG:
+            print(f"[DEBUG] Selected device: {devices[0]}")
+        return devices[0]
+    # Multiple devices found -- prompt user
+    if DEBUG:
+        print(f"[DEBUG] Multiple devices found, prompting user...")
+    print("Multiple CircuitPython devices found:")
+    for i, d in enumerate(devices, 1):
+        print(f"  {i}) {d}")
+    while True:
+        try:
+            choice = int(input("Select device (number): "))
+            if 1 <= choice <= len(devices):
+                selected = devices[choice - 1]
+                if DEBUG:
+                    print(f"[DEBUG] User selected: {selected}")
+                return selected
+        except ValueError:
+            pass
+        print("Invalid choice.")
+
+DST = get_device()
 
 EXCLUDE_DIRS = {
     "__pycache__", ".claude", ".fseventsd",
@@ -92,6 +140,13 @@ def sync(verbose=True):
     """One-shot sync from E: to G:. Returns number of files changed."""
     changed = 0
     src_files = get_src_files()
+
+    # Wipe ultrasetup/ on device so stale configs are removed
+    dst_ultrasetup = DST / "ultrasetup"
+    if dst_ultrasetup.is_dir():
+        shutil.rmtree(dst_ultrasetup)
+        if verbose:
+            print("  Cleared ultrasetup/")
 
     # Copy new/modified files
     for rel, src_path in src_files.items():
