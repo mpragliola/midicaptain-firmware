@@ -111,6 +111,10 @@ stompmode = [2]
 ; ledX is the color of the key LED per cycle step. X is the cycle step number.
 ; a null color ([] or [-]) means the LED is unchanged.
 ; black color (0x000000) means the LED is off.
+; [*] repeats the previous color in the same tuple, e.g.:
+;   led1 = [C_GREEN][*][*]  is equivalent to  led1 = [C_GREEN][C_GREEN][C_GREEN]
+;   led1 = [-][C_RED][*]    is equivalent to  led1 = [-][C_RED][C_RED]
+; [*] as the first token (no prior value) is treated as null (no change).
 ; ledXl is the same for the long press cycle step.
 led1 = [C_GREEN][-][C_GREEN]
 led2 = [C_BLUE][-][C_BLUE]

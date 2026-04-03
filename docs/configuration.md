@@ -48,6 +48,15 @@ config_param3 = [val1][val2][val3] [val4][val5][val6]
 * you can assign a **tuple**
 * you can assign an **array of tuples**
 
+Within a tuple, `[*]` repeats the previous value:
+
+```
+led1 = [C_GREEN][*][*]   ; same as [C_GREEN][C_GREEN][C_GREEN]
+led1 = [-][C_RED][*]     ; same as [-][C_RED][C_RED]
+```
+
+`[*]` as the first token (no prior value) is treated as null (no change).
+
 >You can find a complete breakdown of the file format specs
 > in [the config template file](../ultrasetup/config-template.txt).
 

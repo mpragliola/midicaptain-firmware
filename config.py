@@ -73,6 +73,21 @@ def parse_brackets(s):
     return result
 
 
+def _expand_repeat(vals):
+    """Expand [*] tokens: each [*] repeats the previous token value.
+    [*] with no prior value resolves to None (treated as empty by callers).
+    """
+    result = []
+    last = None
+    for v in vals:
+        if v == "*":
+            result.append(last)
+        else:
+            last = v
+            result.append(v)
+    return result
+
+
 def parse_commands(s):
     """Parse a command string into a list of (a, b, c, d) tuples."""
     cmds = []
@@ -305,13 +320,13 @@ def load_page(page_num, config_name=None):
                     kc["stompmode"] = int(vals[0]) if vals else 0
 
                 elif k.startswith("led") and k.endswith("l") and k[3:-1].isdigit():
-                    colors = [parse_led_color(c) for c in vals]
+                    colors = [parse_led_color(c) for c in _expand_repeat(vals)]
                     while len(colors) < 3:
                         colors.append(None)
                     kc["leds_l"].append(colors[:3])
 
                 elif k.startswith("led") and k[3:].isdigit():
-                    colors = [parse_led_color(c) for c in vals]
+                    colors = [parse_led_color(c) for c in _expand_repeat(vals)]
                     while len(colors) < 3:
                         colors.append(None)
                     kc["leds"].append(colors[:3])
