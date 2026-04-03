@@ -6,7 +6,7 @@ from adafruit_midi.control_change import ControlChange
 from adafruit_midi.note_on import NoteOn
 import state as S
 import terminalio
-from config import load_page, list_configs, _resolve
+from config import list_configs, _resolve
 from pages import Page
 
 
@@ -79,9 +79,9 @@ def exec_commands(cmds):
             cmd_id = int(_b) if (_b and _b != "-") else -1
             if S.DEBUG:
                 print("[CMD] {} | macro {}".format(_dbg_key(), cmd_id))
-            macro = S.cfg.get("cmds", {}).get(cmd_id)
+            macro = S.current_page.cmds.get(cmd_id)
             if macro is None:
-                macro = S.cfg.get("global_cmds", {}).get(cmd_id)
+                macro = S.current_page.global_cmds.get(cmd_id)
             if macro:
                 for mcmd in macro:
                     try:
@@ -121,23 +121,24 @@ def _exec_one_command(cmd):
         if S.DEBUG:
             print("[CMD] {} | KEY {} step={} lstep={}".format(_dbg_key(), S._key_name(key_num), c, d))
         if 0 <= key_num < S.NUM_TOTAL_KEYS and key_num != S._active_key:
-            kc_key = S.cfg["keys"][key_num]
+            page = S.current_page
+            kc_key = page.get_key(key_num)
             if c and c != "-":
                 target_step = int(c) - 1
-                S.cycle_pos[key_num] = (target_step - 1) % max(1, kc_key["cycle"])
+                page.set_cycle_pos(key_num, (target_step - 1) % max(1, kc_key["cycle"]))
                 g = kc_key["group"]
                 if g > 0:
-                    S.group_active[g] = key_num
+                    page.set_group_active(g, key_num)
             press_key(key_num)
             release_key(key_num, long_press=False)
             if d and d != "-":
                 target_lstep = int(d) - 1
                 lc_count = kc_key["longcycle"]
                 if lc_count > 0:
-                    S.long_cycle_pos[key_num] = (target_lstep - 1) % lc_count
+                    page.set_long_cycle_pos(key_num, (target_lstep - 1) % lc_count)
                     lg = kc_key["longgroup"]
                     if lg > 0:
-                        S.long_group_active[lg] = key_num
+                        page.set_group_active_long(lg, key_num)
                     longpress_key(key_num)
         return
 
@@ -182,19 +183,14 @@ def apply_page():
     S.pixels.brightness    = max(0.0, min(1.0, S.current_page.led_brightness / 100))
     S.backlight.duty_cycle = int(max(0, min(100, S.current_page.screen_brightness)) / 100 * 65535)
 
-    S.group_active = {}
-    S.long_group_active = {}
     S.current_page.reset()
-    for i in range(S.NUM_TOTAL_KEYS):
-        S.cycle_pos[i]      = -1
-        S.long_cycle_pos[i] = -1
     for i in range(S.NUM_PHYSICAL_KEYS):
         clear_key_leds(i)
     S.pixels.show()
 
     # Apply page_label colors and full-width background bar
-    S.page_label.color = S.cfg["page_color"]
-    bg = S.cfg["page_bgcolor"]
+    S.page_label.color = S.current_page.color
+    bg = S.current_page.bgcolor
     if bg is not None:
         S._page_bar_palette[0] = bg
         S._page_bar_palette.make_opaque(0)
@@ -202,11 +198,11 @@ def apply_page():
         S._page_bar_palette.make_transparent(0)
 
     # Queue display update
-    S._pending_page = S.cfg["page_name"]
+    S._pending_page = S.current_page.name
 
     # --- Visualization layout ---
-    ml_size = S.cfg["vis_mainlabel_size"]
-    n_subs  = S.cfg["vis_sublabels"]
+    ml_size = S.current_page.vis_mainlabel_size
+    n_subs  = S.current_page.vis_sublabels
     sat, ch, num_rows, sub_font, sub_scale, mc = S._compute_vis_layout(ml_size, n_subs)
     S._vis_sublabels     = n_subs
     S._vis_sub_max_chars = mc
@@ -255,7 +251,7 @@ def apply_page():
 
     # Position active sublabel slots
     for i in range(n_subs):
-        if S.cfg["keys"][i]["stompmode"] > 0:
+        if S.current_page.keys[i]["stompmode"] > 0:
             col = i % 3
             row = i // 3
             ry  = sat + ch // 2 + row * ch
@@ -300,12 +296,11 @@ def switch_page(page_num):
     S._page_switched = False
     S.page_cur = page_num
     S.current_page = Page(page_num)
-    S.cfg = S.current_page.cfg
     apply_page()
-    if S.cfg["page_errors"]:
-        _show_page_errors(S.cfg["page_errors"], page_num)
+    if S.current_page.errors:
+        _show_page_errors(S.current_page.errors, page_num)
     else:
-        exec_commands(S.cfg["init_commands"])
+        exec_commands(S.current_page.init_commands)
     S._page_switched = True
 
 
@@ -316,34 +311,33 @@ def switch_page(page_num):
 def press_key(key_idx):
     """Handle a confirmed short press on key_idx."""
     S._page_switched = False
-    kc           = S.cfg["keys"][key_idx]
+    page         = S.current_page
+    kc           = page.get_key(key_idx)
     group        = kc["group"]
-    total_cycles = kc["cycle"]
     leds         = kc["leds"]
     labels       = kc["labels"]
 
     # --- Group (radio-button) logic ---
     if group > 0:
-        prev_active       = S.group_active.get(group, None)
-        group_cycle_reset = S.cfg["group_cycle"].get(group, False)
+        prev_active       = page.get_group_active(group)
+        group_cycle_reset = page.group_cycle.get(group, False)
         for i in range(S.NUM_TOTAL_KEYS):
-            if i != key_idx and S.cfg["keys"][i]["group"] == group:
+            if i != key_idx and page.get_key(i)["group"] == group:
                 if i < S.NUM_PHYSICAL_KEYS:
                     clear_key_leds(i)
-                S.cycle_pos[i] = -1
-                S.long_cycle_pos[i] = -1
-                if i < S._vis_sublabels and S.cfg["keys"][i]["stompmode"] > 0:
+                page.set_cycle_pos(i, -1)
+                page.set_long_cycle_pos(i, -1)
+                if i < S._vis_sublabels and page.get_key(i)["stompmode"] > 0:
                     S._pending_subs[i] = ""
                     S._pending_sub_colors[i] = -1
         if group_cycle_reset and prev_active != key_idx:
-            S.cycle_pos[key_idx] = -1
-        S.group_active[group] = key_idx
+            page.set_cycle_pos(key_idx, -1)
+        page.set_group_active(group, key_idx)
         if key_idx >= S.NUM_PHYSICAL_KEYS:
             S.pixels.show()
 
     # --- Advance cycle ---
-    S.cycle_pos[key_idx] = (S.cycle_pos[key_idx] + 1) % total_cycles
-    step = S.cycle_pos[key_idx]
+    step = page.advance_cycle(key_idx)
 
     # --- MIDI commands (may trigger switch_page which sets _page_switched) ---
     cmd_step = step + 1
@@ -367,7 +361,7 @@ def press_key(key_idx):
             S._pending_subs[key_idx] = lbl
             _update_sub_color(key_idx, leds[step] if step < len(leds) else [])
         elif sm == 2 and kc["longcycle"] > 0:
-            lstep = S.long_cycle_pos[key_idx]
+            lstep = page.get_long_cycle_pos(key_idx)
             labels_l = kc["labels_l"]
             S._pending_subs[key_idx] = labels_l[lstep] if 0 <= lstep < len(labels_l) else ""
 
@@ -376,34 +370,34 @@ def press_key(key_idx):
 
 def longpress_key(key_idx):
     """Handle a confirmed long press on key_idx."""
-    kc        = S.cfg["keys"][key_idx]
+    page      = S.current_page
+    kc        = page.get_key(key_idx)
     longcycle = kc["longcycle"]
     longgroup = kc["longgroup"]
 
     if longcycle > 0:
         # Long group (radio-button) logic for long presses
         if longgroup > 0:
-            prev_active = S.long_group_active.get(longgroup, None)
+            prev_active = page.get_group_active_long(longgroup)
             if prev_active is not None and prev_active != key_idx:
                 if prev_active < S.NUM_PHYSICAL_KEYS:
-                    prev_kc = S.cfg["keys"][prev_active]
-                    prev_step = S.cycle_pos[prev_active]
+                    prev_kc = page.get_key(prev_active)
+                    prev_step = page.get_cycle_pos(prev_active)
                     prev_leds = prev_kc["leds"]
                     if prev_step >= 0 and prev_step < len(prev_leds):
                         set_key_leds(prev_active, prev_leds[prev_step])
-                S.long_cycle_pos[prev_active] = -1
+                page.set_long_cycle_pos(prev_active, -1)
                 if prev_active < S._vis_sublabels:
                     S._pending_subs[prev_active] = ""
                     S._pending_sub_colors[prev_active] = -1
             if prev_active != key_idx:
-                S.long_cycle_pos[key_idx] = -1
-            S.long_group_active[longgroup] = key_idx
+                page.set_long_cycle_pos(key_idx, -1)
+            page.set_group_active_long(longgroup, key_idx)
             if key_idx >= S.NUM_PHYSICAL_KEYS and prev_active is not None and prev_active < S.NUM_PHYSICAL_KEYS:
                 S.pixels.show()
 
         # Advance independent long-press cycle
-        S.long_cycle_pos[key_idx] = (S.long_cycle_pos[key_idx] + 1) % longcycle
-        lstep    = S.long_cycle_pos[key_idx]
+        lstep = page.advance_long_cycle(key_idx)
         cmd_step = lstep + 1
 
         leds_l = kc["leds_l"]
@@ -418,7 +412,7 @@ def longpress_key(key_idx):
             if lstep < len(leds_l):
                 _update_sub_color(key_idx, leds_l[lstep])
     else:
-        cmd_step = max(1, S.cycle_pos[key_idx] + 1)
+        cmd_step = max(1, page.get_cycle_pos(key_idx) + 1)
 
     _run_as_key(key_idx, kc["commands"].get((cmd_step, "ldn"), []))
     S.display_dirty = True
@@ -428,14 +422,15 @@ def release_key(key_idx, long_press=False):
     """Handle key release. Fires lup (after long press) or up (after short press)."""
     if S._page_switched:
         return
-    kc        = S.cfg["keys"][key_idx]
+    page      = S.current_page
+    kc        = page.get_key(key_idx)
     longcycle = kc["longcycle"]
 
     if long_press:
-        cmd_step = (S.long_cycle_pos[key_idx] + 1) if longcycle > 0 else (S.cycle_pos[key_idx] + 1)
+        cmd_step = (page.get_long_cycle_pos(key_idx) + 1) if longcycle > 0 else (page.get_cycle_pos(key_idx) + 1)
         _run_as_key(key_idx, kc["commands"].get((cmd_step, "lup"), []))
     else:
-        cmd_step = S.cycle_pos[key_idx] + 1
+        cmd_step = page.get_cycle_pos(key_idx) + 1
         _run_as_key(key_idx, kc["commands"].get((cmd_step, "up"), []))
 
 
@@ -447,8 +442,8 @@ def process_capture_cc(channel, control, value):
     """Process a CC message against the ext_capture_cc config.
     Returns True if the message matched and was handled.
     """
-    cap_ch = S.cfg.get("capture_ch", -1)
-    cap_cc = S.cfg.get("capture_cc", -1)
+    cap_ch = S.current_page.capture_channel
+    cap_cc = S.current_page.capture_cc
 
     if cap_ch < 0 or cap_cc < 0:
         return False
@@ -507,12 +502,12 @@ def switch_config(name):
     """
     S.cfg_name = name
     S.page_cur = 0
-    S.cfg = load_page(0)
+    S.current_page = Page(0)
     S.pixels.fill((0, 0, 0))
     S.pixels.show()
     S.display.show(S.splash)       # restore performance display group
     apply_page()
-    exec_commands(S.cfg["init_commands"])
+    exec_commands(S.current_page.init_commands)
     S._page_switched = True
 
 
@@ -674,7 +669,7 @@ def exit_explorer():
     S.pixels.show()
     S.display.show(S.splash)
     apply_page()
-    exec_commands(S.cfg["init_commands"])
+    exec_commands(S.current_page.init_commands)
 
 
 def explorer_key(key_idx):

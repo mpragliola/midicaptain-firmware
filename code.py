@@ -30,7 +30,7 @@ except ImportError:
 from adafruit_st7789 import ST7789
 
 import state as S
-from config import load_page, list_configs     # list_configs: discover config .txt files
+from config import list_configs     # list_configs: discover config .txt files
 from pages import Page
 from engine import (exec_commands, apply_page, switch_page,
                     switch_config, enter_explorer, exit_explorer, explorer_key,
@@ -193,22 +193,21 @@ if "init" in _startup_cfgs:
 elif _startup_cfgs:
     S.cfg_name = _startup_cfgs[0]
 S.current_page = Page(S.page_cur)
-S.cfg = S.current_page.cfg
 
 # Apply background once — loaded from [global] section, never changed on page switches
-_bg_img = S.cfg.get("page_bg_img")
+_bg_img = S.current_page.background_image
 if _bg_img:
     try:
         _bg_file = open("wallpaper/{}.bmp".format(_bg_img), "rb")
         _bmp = displayio.OnDiskBitmap(_bg_file)
         S.splash[0] = displayio.TileGrid(_bmp, pixel_shader=_bmp.pixel_shader)
     except OSError:
-        _bg_palette[0] = S.cfg.get("page_bg", 0x000000)
+        _bg_palette[0] = S.current_page.background_int
 else:
-    _bg_palette[0] = S.cfg.get("page_bg", 0x000000)
+    _bg_palette[0] = S.current_page.background_int
 
 apply_page()
-exec_commands(S.cfg["init_commands"])
+exec_commands(S.current_page.init_commands)
 
 
 # =============================================================================
@@ -250,8 +249,8 @@ async def key_check():
                         # In explorer: brighten LED on press (visual feedback)
                         explorer_press(i)
                     else:
-                        kc_i = S.cfg["keys"][i]
-                        next_step = (S.cycle_pos[i] + 1) % kc_i["cycle"]
+                        kc_i = S.current_page.keys[i]
+                        next_step = (S.current_page.get_cycle_pos(i) + 1) % kc_i["cycle"]
                         if kc_i["commands"].get((next_step + 1, "dn")):
                             if S.DEBUG:
                                 print("[KEY] {} | dn  | step={}".format(S.KEY_NAMES[i], next_step + 1))
@@ -274,7 +273,7 @@ async def key_check():
                             release_key(i, long_press=True)
                         else:
                             if not S._dn_advanced[i]:
-                                _next = (S.cycle_pos[i] + 1) % max(1, S.cfg["keys"][i]["cycle"])
+                                _next = (S.current_page.get_cycle_pos(i) + 1) % max(1, S.current_page.keys[i]["cycle"])
                                 if S.DEBUG:
                                     print("[KEY] {} | dn  | step={} (deferred)".format(S.KEY_NAMES[i], _next + 1))
                                 press_key(i)
@@ -438,7 +437,7 @@ async def midi_in_task():
                     else:
                         print("[RX]  USB | {}".format(type(msg).__name__))
                 # MIDI thru: forward USB input to DIN-5 output only
-                if S.cfg.get("midi_thru"):
+                if S.current_page.midi_thru:
                     if isinstance(msg, ControlChange):
                         S._uart.write(bytes([0xB0 | msg.channel, msg.control, msg.value]))
                     elif isinstance(msg, ProgramChange):
@@ -468,7 +467,7 @@ async def midi_in_task():
                             elif msg_type == 0x90:
                                 print("[RX]  DIN | NT  ch={} note={} vel={}".format(channel + 1, d1, d2))
                         # MIDI thru: forward DIN-5 input to USB output
-                        if S.cfg.get("midi_thru") and S._usb_midi_iface:
+                        if S.current_page.midi_thru and S._usb_midi_iface:
                             if msg_type == 0xB0:
                                 S._usb_midi_iface.send(ControlChange(d1, d2, channel=channel))
                             elif msg_type == 0xC0:
