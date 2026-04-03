@@ -338,17 +338,17 @@ All configuration lives in the **`ultrasetup/`** folder as plain text files.
 
 | File | Purpose |
 |------|---------|
-| **`ultrasetup/pageN.txt`** | Configuration for page N (`page0.txt`, `page1.txt`, ...) |
+| **`ultrasetup/<name>.txt`** | Config file (all pages in one file, e.g. `init.txt`, `live_rig.txt`) |
 | **`ultrasetup/aliases.txt`** | Named aliases for MIDI CC/PC numbers |
-| **`ultrasetup/page-template.txt`** | Annotated template showing **all** available options with comments |
+| **`ultrasetup/config-template.txt`** | Annotated template showing **all** available options with comments |
 
-### Page file format
+### Config file format
 
-Page files use an **INI-like format** with bracket-delimited values. Lines starting with `;` are comments. There are three section types:
+Config files use an **INI-like format** with bracket-delimited values. Lines starting with `;` are comments. Each file contains one `[global]` section followed by one or more `[page]` sections (numbered progressively from 0). There are three section types:
 
 ---
 
-**`[global]`** — settings that apply across all pages (loaded once from page 0):
+**`[global]`** — settings that apply across all pages:
 
 ```ini
 led_brightness = [50]
@@ -461,9 +461,9 @@ ultramidi/
   code.py              Entire firmware: hardware init, async tasks,
                        config parser, MIDI engine, display renderer
   ultrasetup/          User configuration
-    pageN.txt            Page config files
+    <name>.txt           Config files (all pages in one file)
     aliases.txt          MIDI CC/PC name aliases
-    page-template.txt    Annotated config template
+    config-template.txt  Annotated config template
   fonts/               PCF bitmap fonts (Bahnschrift 24-72pt)
   wallpaper/           Optional BMP background images (240x240)
   lib/                 CircuitPython libraries (adafruit_midi,

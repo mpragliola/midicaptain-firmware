@@ -80,8 +80,8 @@ CircuitPython auto-executes `code.py` on boot. There is no OS; the firmware is a
 
 1. **boot.py** reads GP1 to select USB-drive vs. normal mode; sets filesystem writability.
 2. **code.py** initialises all hardware (SPI display, PWM backlight, GPIO switches, NeoPixels, UART), loads fonts, reads global aliases from `ultrasetup/aliases.txt`.
-3. **Config discovery**: scans `ultrasetup/` for named config subfolders. Prefers `init/` if it exists, otherwise picks the first subdirectory alphabetically. Sets `S.cfg_name` to the chosen config name.
-4. Loads `ultrasetup/<config>/page0.txt`, builds the display layer stack, applies the page layout (LEDs, labels, sublabels), runs `init_commands`, then enters the async event loop.
+3. **Config discovery**: scans `ultrasetup/` for `.txt` config files. Prefers `init.txt` if it exists, otherwise picks the first config file alphabetically. Sets `S.cfg_name` to the chosen config name.
+4. Loads page 0 from `ultrasetup/<config>.txt`, builds the display layer stack, applies the page layout (LEDs, labels, sublabels), runs `init_commands`, then enters the async event loop.
 
 ### Async event loop
 
@@ -191,9 +191,9 @@ Config-driven. Each key/step/action maps to a list of commands:
 
 ### Configuration
 
-- **Configs:** each configuration is a named subfolder under `ultrasetup/` (e.g. `init/`, `live_rig/`). The active config is chosen at boot (`init/` preferred, else first alphabetically). Can be switched at runtime via Explorer Mode.
-- **Page files:** `ultrasetup/<config>/pageN.txt` in INI-like format with bracket-delimited values. Sections: [global], [page], [key0] through [key31].
-- **Aliases:** `ultrasetup/aliases.txt` (global, top-level) maps symbolic names to integers (e.g. tx_gain = 102) for use in all page files across all configs.
+- **Configs:** each configuration is a `.txt` file under `ultrasetup/` (e.g. `init.txt`, `live_rig.txt`). The active config is chosen at boot (`init.txt` preferred, else first alphabetically). Can be switched at runtime via Explorer Mode.
+- **Config file format:** INI-like with bracket-delimited values. One `[global]` section (shared settings), then multiple `[page]` sections numbered progressively from 0, each followed by its `[key0]` through `[key31]` sections.
+- **Aliases:** `ultrasetup/aliases.txt` (global) maps symbolic names to integers (e.g. tx_gain = 102) for use in all config files.
 - **Explorer Mode:** SW3+SWA held 0.5 s opens a full-screen config browser. Uses a dedicated `displayio.Group` with plain `Label` objects (no tiles). LEDs show role colors at dim intensity, brightening on press. On confirm, `switch_config()` loads page 0 of the selected config and returns to performance mode.
 
 ## File Map
@@ -208,7 +208,7 @@ Config-driven. Each key/step/action maps to a list of commands:
 | validate.py | Page config validator (runs on-device at page load) |
 | lib/ | Pre-compiled CircuitPython libraries (~133 KB): asyncio, adafruit_midi, adafruit_st7789, neopixel, display_text, bitmap_font, etc. |
 | ultrasetup/aliases.txt | Global MIDI aliases shared by all configs |
-| ultrasetup/&lt;config&gt;/ | Named configuration folder; contains page0.txt, page1.txt, ... |
-| ultrasetup/page-template.txt | Reference template with all config options documented |
+| ultrasetup/&lt;name&gt;.txt | Config file; contains [global], [page], and [keyN] sections for all pages |
+| ultrasetup/config-template.txt | Reference template with all config options documented |
 | fonts/ | PCF bitmap fonts (~209 KB): Bahnschrift at 24, 32, 48, 64 pt |
 | wallpaper/ | Optional BMP background images (~174 KB) |

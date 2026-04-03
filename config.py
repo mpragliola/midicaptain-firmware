@@ -1,4 +1,4 @@
-# config.py — page config parsing (no hardware dependencies)
+# config.py — config file parsing (no hardware dependencies)
 
 import os
 import state as S
@@ -112,15 +112,15 @@ def parse_color_int(s):
 
 
 def list_configs():
-    """Return sorted list of config subdirectory names under ultrasetup/.
+    """Return sorted list of config names under ultrasetup/.
 
-    Each configuration is a named subfolder (e.g. ultrasetup/init/,
-    ultrasetup/live_rig/).  Files (anything with a dot in the name, like
-    aliases.txt) are skipped.  Directories are identified via the stat
-    flag 0x4000 (S_IFDIR), which is the portable way on CircuitPython.
-    Results are capped at 32 entries to match NUM_TOTAL_KEYS.
+    Each configuration is a .txt file (e.g. ultrasetup/init.txt,
+    ultrasetup/live_rig.txt).  The config name is the filename without
+    the .txt extension.  aliases.txt and config-template.txt are excluded.
+    Directories are skipped.  Results are capped at 32 entries.
     """
     result = []
+    _skip = ("aliases", "config-template")
     try:
         entries = os.listdir("ultrasetup")
     except OSError:
@@ -128,28 +128,36 @@ def list_configs():
     for name in entries:
         if len(result) >= 32:
             break
-        if "." in name:          # skip files like aliases.txt, page-template.txt
+        if not name.endswith(".txt"):
+            continue
+        stem = name[:-4]
+        if stem in _skip:
             continue
         try:
-            # os.stat()[0] is st_mode; bit 0x4000 = directory
+            # skip directories (bit 0x4000 = S_IFDIR)
             if os.stat("ultrasetup/{}".format(name))[0] & 0x4000:
-                result.append(name)
+                continue
         except OSError:
             pass
+        result.append(stem)
     result.sort()
     return result
 
 
 def load_page(page_num, config_name=None):
-    """Load and parse a page config file into a cfg dict.
+    """Load and parse a single page from a config file into a cfg dict.
 
-    Path: ultrasetup/<config_name>/page<page_num>.txt
+    Path: ultrasetup/<config_name>.txt
+    The file contains one [global] section (parsed for every page) and
+    multiple [page] sections numbered progressively from 0.  Each [page]
+    is followed by its [keyN] sections.  Only the requested page_num is
+    populated; other pages are skipped.
     If config_name is None, uses the currently active config (S.cfg_name).
     Returns a complete cfg dict with defaults for any missing fields.
     """
     if config_name is None:
         config_name = S.cfg_name
-    filename = "ultrasetup/{}/page{}.txt".format(config_name, page_num)
+    filename = "ultrasetup/{}.txt".format(config_name)
 
     cfg = {
         "page_name": "PAGE {}".format(page_num),
@@ -187,6 +195,8 @@ def load_page(page_num, config_name=None):
         return cfg
 
     current_section = None
+    page_idx = -1           # incremented on each [page]; -1 = before first page
+
     with open(filename, "r") as f:
         for raw in f:
             line = raw.strip()
@@ -194,10 +204,19 @@ def load_page(page_num, config_name=None):
                 continue
 
             if line.startswith("[") and line.endswith("]") and "=" not in line:
-                current_section = line[1:-1]
+                sec = line[1:-1]
+                if sec == "global":
+                    current_section = "global"
+                elif sec == "page":
+                    page_idx += 1
+                    current_section = "page" if page_idx == page_num else "_skip"
+                elif sec.startswith("key") and sec[3:].isdigit():
+                    current_section = sec if page_idx == page_num else "_skip"
+                else:
+                    current_section = "_skip"
                 continue
 
-            if "=" not in line:
+            if "=" not in line or current_section is None or current_section == "_skip":
                 continue
 
             k, _, v = line.partition("=")
@@ -205,7 +224,7 @@ def load_page(page_num, config_name=None):
             v    = v.strip()
             vals = parse_brackets(v)
 
-            # ---- [global] section ----------------------------------------
+            # ---- [global] section (always parsed) ------------------------
             if current_section == "global":
                 if k == "led_brightness":
                     cfg["led_brightness"] = int(vals[0]) if vals else 30
@@ -226,7 +245,7 @@ def load_page(page_num, config_name=None):
                     cmd_id = int(k[3:])
                     cfg["global_cmds"][cmd_id] = parse_commands(v)
 
-            # ---- [page] section -----------------------------------------
+            # ---- [page] section (target page only) ----------------------
             elif current_section == "page":
                 if k == "page_name":
                     cfg["page_name"] = vals[0] if vals else ""
@@ -249,7 +268,7 @@ def load_page(page_num, config_name=None):
                     gid = int(k[len("group_cycle"):])
                     cfg["group_cycle"][gid] = (vals[0] == "1") if vals else False
 
-            # ---- [keyN] section -----------------------------------------
+            # ---- [keyN] section (target page only) ----------------------
             elif current_section is not None and current_section.startswith("key"):
                 try:
                     idx = int(current_section[3:])

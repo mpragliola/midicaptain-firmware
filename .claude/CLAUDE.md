@@ -48,14 +48,16 @@ Never block the event loop. No `time.sleep()` in the main loop.
 
 ## Configuration System
 
-- Configs live in `ultrasetup/<config_name>/` subdirectories
-- Each config has `page0.txt`, `page1.txt`, etc. (INI-like format with `[bracket]` values)
+- Configs are `.txt` files directly under `ultrasetup/` (e.g. `init.txt`, `live_rig.txt`)
+- The filename (without `.txt`) is the config name shown in Explorer Mode
+- Each file contains one `[global]` section, then multiple `[page]` sections (numbered progressively from 0), each followed by its `[keyN]` sections
+- `aliases.txt` and `config-template.txt` are excluded from config discovery
 - Global aliases in `ultrasetup/aliases.txt`
-- Template with all options documented: `ultrasetup/page-template.txt`
+- Template with all options documented: `ultrasetup/config-template.txt`
 
 ### Config Syntax
 
-Sections: `[global]`, `[page]`, `[key0]`-`[key31]`
+Sections: `[global]`, `[page]` (repeatable), `[key0]`-`[key31]` (per page)
 Values are bracket-delimited: `[channel][CC][control][value]`
 Cycle steps are 1-based in config, 0-based internally.
 Colors: hex `0xRRGGBB`, `-` = unchanged, `0x000000` = off.
@@ -93,7 +95,7 @@ Docs live in `docs/`. Key files:
 - `VISUALIZATIONS.md` — display layout modes
 
 When making structural changes to the firmware, update `docs/ARCHITECTURE.md`.
-When changing config format or commands, update the relevant doc and `ultrasetup/page-template.txt`.
+When changing config format or commands, update the relevant doc and `ultrasetup/config-template.txt`.
 
 ## Files NOT to Modify
 

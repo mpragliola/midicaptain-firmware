@@ -15,15 +15,16 @@ Navigating between pages is fully customizable.
 
 ![Alt text](pages.png)
 
-Each page has a **configuration file** inside its **config subfolder** 
+Pages are defined as successive `[page]` sections within a config file
 (see [Multiple Configurations](#multiple-configurations) below).
-Starting from `page0.txt`, then `page1.txt` and so on.  
-Page 0 holds also global configurations.
+They are numbered progressively from 0 in the order they appear.
+The `[global]` section (at the top of the file) holds shared settings
+that apply to all pages.
 
-Simply add, remove or modify the `pageX.txt` files to add, remove or
-modify pages.
+Simply add, remove or modify `[page]` sections (and their `[keyN]` sections)
+to add, remove or modify pages.
 
-> See comments in `page-template.txt` for a complete spec.
+> See comments in `config-template.txt` for a complete spec.
 
 ### Page navigation
 
@@ -38,18 +39,21 @@ any page.
 
 #### Example configuration
 
-Alternate between page 0 and 1 using key5's long press:
-
-`page0.txt`:
+Alternate between page 0 and 1 using key5's press. Both pages are in the
+same config file:
 
 ```
+[page]
+page_name = [MAIN]
+...
+
 [key5]
 key1dn = [PAGE][1]
-```
 
-`page1.txt`:
+[page]
+page_name = [LEAD]
+...
 
-```
 [key5]
 key1dn = [PAGE][0]
 ```
@@ -60,38 +64,30 @@ key1dn = [PAGE][0]
 
 ## Multiple Configurations
 
-A **configuration** is a named set of pages. Each configuration lives in its
-own subfolder under `ultrasetup/`:
+A **configuration** is a named set of pages stored in a single `.txt` file
+under `ultrasetup/`:
 
 ```
 ultrasetup/
-  aliases.txt          <-- global aliases, shared by all configs
-  page-template.txt    <-- reference template (not loaded by firmware)
-  init/
-    page0.txt
-    page1.txt
-    ...
-  live_rig/
-    page0.txt
-    ...
-  rehearsal/
-    page0.txt
-    ...
+  aliases.txt            <-- global aliases, shared by all configs
+  config-template.txt    <-- reference template (not loaded by firmware)
+  init.txt
+  live_rig.txt
+  rehearsal.txt
 ```
 
-Each subfolder is an independent configuration with its own set of
-`page0.txt`, `page1.txt`, etc. The `aliases.txt` file is **global** and
-shared across all configurations — it stays at the `ultrasetup/` root level,
-not inside any config subfolder.
+Each file is an independent configuration containing all its pages. The
+filename (without `.txt`) is the config name shown in Explorer Mode.
+The `aliases.txt` file is **global** and shared across all configurations.
 
 ### Startup rule
 
-On boot the firmware scans `ultrasetup/` for subdirectories and picks the
-active config:
+On boot the firmware scans `ultrasetup/` for `.txt` config files and picks
+the active config:
 
-1. If a subfolder named **`init`** exists, it is loaded.
-2. Otherwise, the **first subfolder alphabetically** is loaded.
-3. If no subfolders exist at all, the firmware starts with an empty default
+1. If a file named **`init.txt`** exists, it is loaded.
+2. Otherwise, the **first config file alphabetically** is loaded.
+3. If no config files exist at all, the firmware starts with an empty default
    config (no pages, no commands — the display will show "PAGE 0").
 
 ### Explorer Mode — switching configs at runtime
@@ -156,7 +152,7 @@ momentarily when the key is pressed, providing visual feedback.
 
 - **Cancel** (SW3): returns to performance mode with the previous config
   unchanged. The display, LEDs, and init_commands are re-applied as they were.
-- **Confirm** (SWC): loads the selected config's `page0.txt`, resets all key
+- **Confirm** (SWC): loads the selected config's first page, resets all key
   state, applies the page layout, and runs init_commands. You are now in
   performance mode with the new config active.
 
@@ -172,22 +168,10 @@ momentarily when the key is pressed, providing visual feedback.
 
 1. Boot in USB mode (hold SW1 while powering on).
 2. Inside the `ultrasetup/` folder on the MIDICAPTAIN drive, create a new
-   subfolder (e.g. `ultrasetup/my_setup/`).
-3. Copy `page0.txt` (and any other pages) from an existing config into the
-   new subfolder.
-4. Edit the files as needed.
+   `.txt` file (e.g. `ultrasetup/my_setup.txt`).
+3. Add a `[global]` section, then one or more `[page]` sections with their
+   `[keyN]` sections. You can copy from an existing config file as a starting
+   point.
+4. Edit the file as needed.
 5. Safely eject and reboot.
 6. Use Explorer Mode (SW3+SWA hold) to switch to the new config at runtime.
-
-### Migration from single-config firmware (breaking change)
-
-> **Warning:** This is a breaking change. The old flat structure
-> (`ultrasetup/page0.txt`, `ultrasetup/page1.txt`, ...) is no longer supported.
-
-Steps:
-
-1. Boot in USB mode (hold SW1 while powering on).
-2. Inside `ultrasetup/`, create a subfolder named `init/`.
-3. Move all `page*.txt` files into `ultrasetup/init/`.
-4. Leave `aliases.txt` where it is — it remains at `ultrasetup/aliases.txt`.
-5. Safely eject and reboot.

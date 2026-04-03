@@ -1,3 +1,17 @@
+; =================================================================
+; UltraMidi config template
+; =================================================================
+; Each config is a single .txt file under ultrasetup/.
+; The filename (without .txt) is the config name shown in Explorer Mode.
+; Example: "myband.txt" appears as "myband" in the config browser.
+;
+; A config file contains:
+;   1. One [global] section (shared settings for all pages)
+;   2. One or more [page] sections, each followed by its [keyN] sections
+;
+; Pages are numbered progressively from 0 in the order they appear.
+; =================================================================
+
 [global]
 ; from 0 to 100
 led_brightness = [50]
@@ -20,6 +34,10 @@ cmd1 = [1][PC][0] [1][CC][20][127]
 
 ; default 0 (no thru), =1 allows MIDI Thru
 midi_thru = [1]
+
+; =================================================================
+; PAGE 0
+; =================================================================
 
 [page]
 ; page_name is the name of the page shown in the app. It can be any string
@@ -59,7 +77,7 @@ init_commands = [1][CC][32][2] [KEY][0][1][]
 group_cycle1 = [1]
 
 ; Page macros. cmdX (where 1<=X<=9) is a command macro. It overrides global
-; macros. 
+; macros.
 cmd1 = [1][PC][0] [1][CC][20][127]
 
 [key0]
@@ -72,7 +90,7 @@ group = [1]
 ; Keys in the same longgroup behave like a radio button group for long presses.
 longgroup = [1]
 
-; cycle is the number of steps in the key cycle from 0 to 9. 
+; cycle is the number of steps in the key cycle from 0 to 9.
 ; If 1, the key does not cycle.
 cycle = [3]
 
@@ -87,13 +105,13 @@ longcycle = [2]
 ; 3x2 blocks of the 6 available in main visualization. You can have the button
 ; show either the main or the sub (longpress) cycle. The background color will
 ; be the first non-null color of the LED definition. While the 3 LEDS provide
-; reference, using blocks allows you to use labels (although limited to 5 chars). 
+; reference, using blocks allows you to use labels (although limited to 5 chars).
 stompmode = [2]
 
 ; ledX is the color of the key LED per cycle step. X is the cycle step number.
 ; a null color ([] or [-]) means the LED is unchanged.
 ; black color (0x000000) means the LED is off.
-; ledXl is the same for the long press cycle step. 
+; ledXl is the same for the long press cycle step.
 led1 = [0x00ff00][-][0x00ff00]
 led2 = [0x0000ff][-][0x0000ff]
 led3 = [0x0000ff][-][0x00ff00]
@@ -101,7 +119,7 @@ led1l = [-][0xffffff][-]
 led2l = [-][0xff00ff][-]
 
 ; labelX is the text on the key per cycle step. X is the cycle step number.
-; use label1 when there's no cycle. A colon (:) in the label creates a line 
+; use label1 when there's no cycle. A colon (:) in the label creates a line
 ; break, but only for a max of 2 rows and 2x8 characters.
 label1 = [ROW1:ROW2]
 label2 = [Foo]
@@ -114,16 +132,16 @@ label2l = [B OFF]
 ; keyXY is the command or list of commands executed per key
 ; and action. X is the cycle step and Y is the action:
 ; dn = on press, up = on release, ldn = long press, lup = long press
-key1dn = [1][PC][1][] 
-key2dn = [1][PC][2][] 
-key3dn = [1][PC][3][]  
-;key1up = [1][PC][4][] 
-;key2up = [1][PC][5][] 
-;key3up = [1][PC][6][]  
+key1dn = [1][PC][1][]
+key2dn = [1][PC][2][]
+key3dn = [1][PC][3][]
+;key1up = [1][PC][4][]
+;key2up = [1][PC][5][]
+;key3up = [1][PC][6][]
 ; for actions ldn and lup - the number and range of the cycle step
 ; refers to main cycle if longcycle is 0, otherwise it refers to the
 ; long press cycle.
-key1ldn = [1][CC][7][0] 
+key1ldn = [1][CC][7][0]
 key2ldn = [1][CC][7][127]
 ;key3ldn = [1][PC][9][]
 ;key1lup = [1][PC][10][]
@@ -154,7 +172,7 @@ key1dn = [1][CC][4][0]
 key2dn = [1][CC][4][127]
 ; if you don't want the main label to change, you can
 ; leave it empty and use labelXd/u. They will use the
-; secondary label. 
+; secondary label.
 label1d = [H ON]
 label2d = [H OFF]
 
@@ -179,7 +197,7 @@ key1dn = [PAGE][1][][]
 ; Note: stompmode on virtual keys may not map to a display
 ; sub-panel (the 6 panels correspond to physical keys 0-5).
 ;
-; Virtual keys don't need to be contiguous � define only the
+; Virtual keys don't need to be contiguous - define only the
 ; ones you need.
 ;
 ; To trigger key 6 via ext_capture_cc (e.g. ch1/CC#30):
@@ -198,8 +216,20 @@ key1dn = [1][CC][2][127]
 key2dn = [1][CC][2][0]
 
 ;[key10]
-; another virtual key � non-contiguous numbering is fine
+; another virtual key - non-contiguous numbering is fine
 ;cycle = [1]
 ;label1 = [BOOST]
 ;key1dn = [1][CC][50][127]
 ;key1up = [1][CC][50][0]
+
+; =================================================================
+; PAGE 1 - add more [page] sections for additional pages
+; =================================================================
+
+[page]
+page_name = [PAGE 2]
+color = [0x000000]
+bgcolor = [0x0000ff]
+
+[key5]
+key1dn = [PAGE][0]

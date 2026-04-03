@@ -143,7 +143,7 @@ def validate_cfg(cfg, page_num):
     errs = []
     pn = str(page_num)
 
-    # --- Global settings (only meaningful from page 0) ---
+    # --- Global settings ---
     b = cfg["led_brightness"]
     if not (0 <= b <= 100):
         errs.append("p{}:brt={}".format(pn, b))

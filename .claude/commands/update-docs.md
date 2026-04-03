@@ -6,7 +6,7 @@ Read the firmware source files (code.py, engine.py, config.py, state.py, validat
 - docs/CONFIGURATION.md — config file format and options
 - docs/PAGES.md — page system, explorer mode
 - docs/VISUALIZATIONS.md — display layout modes
-- ultrasetup/page-template.txt — annotated config template
+- ultrasetup/config-template.txt — annotated config template
 
 Flag any discrepancies where the docs don't match the code, and fix them. Focus on:
 - New or removed config options

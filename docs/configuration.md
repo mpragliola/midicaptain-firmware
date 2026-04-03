@@ -16,13 +16,19 @@ A companion editor will be available  in the future.
 
 ### How to edit
 
-The configuration text files are under `/ultrasetup/<config_name>/` and can
-be edited with any text editor. Each configuration has its own subfolder
+Configuration files are `.txt` files directly under `/ultrasetup/` and can
+be edited with any text editor. Each file is a complete configuration
 (see [Multiple configurations](#multiple-configurations) below).
 
-They are called `page0.txt`, `page1.txt`, ... and contain 
-the configuration for each page and in case of page 0, also
-some global configurations. 
+The filename (without `.txt`) is the configuration name shown in Explorer Mode.
+For example, `init.txt` appears as "init", and `Metallica Coverband.txt`
+appears as "Metallica Coverband".
+
+A single config file contains:
+1. One `[global]` section (shared settings for all pages)
+2. One or more `[page]` sections, each followed by its `[keyN]` sections
+
+Pages are numbered progressively from 0 in the order they appear in the file.
 
 ![Alt text](pagefiles.png)
 
@@ -43,32 +49,27 @@ config_param3 = [val1][val2][val3] [val4][val5][val6]
 * you can assign an **array of tuples**
 
 >You can find a complete breakdown of the file format specs
-> in [the page template file](../ultrasetup/page-template.txt).
+> in [the config template file](../ultrasetup/config-template.txt).
 
 ### Multiple configurations
 
-The device can store several independent configurations. Each one lives in its
-own subfolder under `ultrasetup/`:
+The device can store several independent configurations. Each one is a `.txt`
+file directly under `ultrasetup/`:
 
 ```
 ultrasetup/
-  aliases.txt          <-- global aliases (shared by all configs)
-  page-template.txt    <-- reference template (not loaded by firmware)
-  init/
-    page0.txt
-    page1.txt
-    ...
-  live_rig/
-    page0.txt
-    ...
+  aliases.txt            <-- global aliases (shared by all configs)
+  config-template.txt    <-- reference template (not loaded by firmware)
+  init.txt               <-- a config file (all pages in one file)
+  live_rig.txt           <-- another config file
 ```
 
-Each subfolder is a self-contained configuration with its own page files.
+Each file is a self-contained configuration with all its pages.
 The `aliases.txt` file is global and shared across all configurations.
 
-**Startup rule:** The firmware loads `init/` on boot. If that folder does not
-exist, the first subfolder alphabetically is loaded instead. If no subfolders
-exist, the firmware starts with an empty default config.
+**Startup rule:** The firmware loads `init.txt` on boot. If that file does not
+exist, the first config file alphabetically is loaded instead. If no config
+files exist, the firmware starts with an empty default config.
 
 **Switching at runtime:** Hold **SW3 + SWA** simultaneously for 0.5 s to open
 Explorer Mode — a full-screen config browser. The display shows a scrollable
@@ -88,16 +89,6 @@ red for cancel, green for confirm. LEDs are dim at idle and brighten on press.
 
 See [Explorer Mode in PAGES.md](PAGES.md#explorer-mode--switching-configs-at-runtime)
 for the full reference including display layout and color coding.
-
-**Migration from single-config firmware (breaking change):**
-
-> The old flat structure (`ultrasetup/page0.txt`, ...) is no longer supported.
-
-1. Boot in USB mode (hold SW1 while powering on).
-2. Create `ultrasetup/init/` on the MIDICAPTAIN drive.
-3. Move all `page*.txt` files into `ultrasetup/init/`.
-4. Leave `aliases.txt` at `ultrasetup/aliases.txt` — it is still global.
-5. Safely eject and reboot.
 
 #### Caveat
 

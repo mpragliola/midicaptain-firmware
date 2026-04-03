@@ -29,7 +29,7 @@ _page_switched       = False
 _pending_page_switch = None
 _active_key          = None
 _pc_state      = {}
-cfg_name       = "init"   # active config subdirectory name under ultrasetup/
+cfg_name       = "init"   # active config name (filename stem under ultrasetup/)
 explorer_mode  = False    # True while the config-browser overlay is active
 
 # Pending display updates
@@ -60,7 +60,7 @@ _explorer_grp       = None   # the displayio.Group shown during explorer
 _explorer_up_lbl    = None   # "^" scroll-up indicator Label
 _explorer_dn_lbl    = None   # "v" scroll-down indicator Label
 _explorer_item_lbls = None   # list of 6 Label objects (visible item slots)
-_explorer_configs   = None   # sorted list of config subfolder names
+_explorer_configs   = None   # sorted list of config names (filename stems)
 _explorer_cursor    = 0      # index into _explorer_configs of highlighted item
 _explorer_scroll    = 0      # index of the first visible item (multiple of 6)
 

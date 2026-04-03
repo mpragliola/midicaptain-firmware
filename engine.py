@@ -478,10 +478,10 @@ def process_capture_cc(channel, control, value):
 # =============================================================================
 # MULTI-CONFIG SUPPORT
 #
-# Configurations are named subfolders under ultrasetup/ (e.g. init/, live_rig/).
-# At boot the firmware picks "init" (or first alphabetically) and loads its
-# page0.txt.  At runtime, Explorer Mode lets the user browse and switch configs
-# without a computer.
+# Configurations are .txt files under ultrasetup/ (e.g. init.txt, live_rig.txt).
+# At boot the firmware picks "init" (or first alphabetically) and loads page 0.
+# At runtime, Explorer Mode lets the user browse and switch configs without a
+# computer.
 #
 # Display isolation: Explorer Mode creates its own displayio.Group and swaps it
 # in via S.display.show(grp).  The performance display (S.splash) is untouched
@@ -497,7 +497,7 @@ def switch_config(name):
 
     Called from explorer_key(5) on confirm.  Sequence:
     1. Set cfg_name and reset page counter to 0
-    2. Parse the new config's page0.txt
+    2. Parse the new config file's first [page] section
     3. Clear explorer LEDs and restore the performance display group
     4. Apply the page layout (LEDs, labels, sublabels)
     5. Run the page's init_commands (same as boot)

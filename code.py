@@ -1,7 +1,7 @@
 # =============================================================================
 # UltraMidi firmware — main entry point
 # Runs on a MidiCaptain Mini 6 (RP2040 / CircuitPython 7.3.1).
-# Reads page config from ultrasetup/pageN.txt, manages 6 footswitches,
+# Reads config from ultrasetup/<name>.txt, manages 6 footswitches,
 # 18 NeoPixel LEDs (3 per switch), a 240×240 ST7789 display and dual MIDI out
 # (USB-MIDI + classic DIN-5 via UART).
 # =============================================================================
@@ -28,7 +28,7 @@ except ImportError:
 from adafruit_st7789 import ST7789
 
 import state as S
-from config import load_page, list_configs     # list_configs: discover config subdirectories
+from config import load_page, list_configs     # list_configs: discover config .txt files
 from engine import (exec_commands, apply_page, switch_page,
                     switch_config, enter_explorer, exit_explorer, explorer_key,
                     explorer_press,                 # LED feedback on key press in explorer
@@ -180,9 +180,9 @@ except (IndexError, AttributeError, ValueError) as e:
 # BOOT
 # =============================================================================
 # --- Config discovery ---
-# Scan ultrasetup/ for named config subfolders (e.g. init/, live_rig/).
+# Scan ultrasetup/ for config .txt files (e.g. init.txt, live_rig.txt).
 # Prefer "init" if it exists, otherwise pick the first alphabetically.
-# If no subfolders exist, cfg_name stays "init" and load_page will
+# If no configs exist, cfg_name stays "init" and load_page will
 # return a default empty config (the file simply won't be found).
 _startup_cfgs = list_configs()
 if "init" in _startup_cfgs:
@@ -191,7 +191,7 @@ elif _startup_cfgs:
     S.cfg_name = _startup_cfgs[0]
 S.cfg = load_page(S.page_cur)
 
-# Apply background once — loaded from [global], never changed on page switches
+# Apply background once — loaded from [global] section, never changed on page switches
 _bg_img = S.cfg.get("page_bg_img")
 if _bg_img:
     try:
