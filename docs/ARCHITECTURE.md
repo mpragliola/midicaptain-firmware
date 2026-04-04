@@ -193,7 +193,7 @@ Config-driven. Each key/step/action maps to a list of commands:
 
 - **Configs:** each configuration is a `.txt` file under `ultrasetup/` (e.g. `init.txt`, `live_rig.txt`). The active config is chosen at boot (`init.txt` preferred, else first alphabetically). Can be switched at runtime via Explorer Mode.
 - **Config file format:** INI-like with bracket-delimited values. One `[global]` section (shared settings), then multiple `[page]` sections numbered progressively from 0, each followed by its `[key0]` through `[key31]` sections.
-- **Aliases:** `ultrasetup/aliases.txt` (global) maps symbolic names to values for use in all config files. Scalar aliases map to a single integer (e.g. `tx_gain = 102`). Tuple aliases map to a bracket sequence (e.g. `MY_LED = [C_GREEN][*][*]`) and expand inline wherever `[MY_LED]` appears. Tuple aliases cascade: inner alias tokens are resolved at load time in file order.
+- **Aliases:** `ultrasetup/aliases.txt` (global) maps symbolic names to integers (e.g. tx_gain = 102) for use in all config files.
 - **Explorer Mode:** SW3+SWA held 0.5 s opens a full-screen config browser. Uses a dedicated `displayio.Group` with plain `Label` objects (no tiles). LEDs show role colors at dim intensity, brightening on press. On confirm, `switch_config()` loads page 0 of the selected config and returns to performance mode.
 
 ## File Map

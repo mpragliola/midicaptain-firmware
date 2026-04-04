@@ -76,34 +76,6 @@ ultrasetup/
 Each file is a self-contained configuration with all its pages.
 The `aliases.txt` file is global and shared across all configurations.
 
-### Aliases
-
-`ultrasetup/aliases.txt` maps symbolic names to values for use in any config file.
-Alias names are substituted wherever they appear as a bracketed token.
-
-**Scalar alias** — maps a name to a single integer:
-
-```
-C_GREEN  = 0x00FF00
-tx_gain  = 102
-```
-
-Usage: `[C_GREEN]` expands to `[0x00FF00]`.
-
-**Tuple alias** — maps a name to a bracket sequence:
-
-```
-MY_LED = [C_GREEN][*][*]
-TX_CMD = [1][CC][tx_gain][127]
-```
-
-Usage: `[MY_LED]` expands inline to `[C_GREEN][*][*]`.
-Tuple aliases cascade: tokens inside the RHS that are themselves aliases are
-resolved at load time, so `TX_CMD` above stores `["1", "CC", "102", "127"]`.
-
-**Ordering:** aliases are resolved in file order; a tuple alias can only
-reference aliases defined above it in `aliases.txt`.
-
 **Startup rule:** The firmware loads `init.txt` on boot. If that file does not
 exist, the first config file alphabetically is loaded instead. If no config
 files exist, the firmware starts with an empty default config.

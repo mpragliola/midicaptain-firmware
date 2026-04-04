@@ -81,7 +81,7 @@ original firmware):
 `n` is the key number (from 0 to 31). Keys 0-5 are physical;
 keys 6-31 are virtual (see CAPTURE.md).
 `c` is optional - will activate cycle step c of that key
-`lc` is optional - will activate long cycle step lc of that key
+`d` is optional - will activate long cycle step d of that key
 
 > Many times one wants a specific key to be activated when
 > loading a page, for example to select a starting Program.
