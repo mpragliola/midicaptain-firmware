@@ -87,7 +87,10 @@ def _load_aliases():
                         _aliases[_ak] = _expand_aliases(parse_brackets(_av))
                     else:
                         try:
-                            _aliases[_ak] = int(_av)
+                            if _av.startswith("0x") or _av.startswith("0X"):
+                                _aliases[_ak] = int(_av[2:], 16)
+                            else:
+                                _aliases[_ak] = int(_av)
                         except ValueError:
                             pass
     except OSError:
