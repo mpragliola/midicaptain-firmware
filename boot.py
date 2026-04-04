@@ -18,8 +18,9 @@ if switch.value is True:
     storage.disable_usb_drive()
     storage.remount("/", readonly=False)
 else:
-	storage.remount("/", readonly=False)
-	m = storage.getmount("/")
-	m.label = "MIDICAPTAIN"
-	storage.enable_usb_drive()
-	storage.remount("/", readonly=True) 	
+    storage.remount("/", readonly=False)
+    m = storage.getmount("/")
+    m.label = "MIDICAPTAIN"
+    storage.enable_usb_drive()
+    storage.remount("/", readonly=True)
+    
