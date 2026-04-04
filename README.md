@@ -2,6 +2,8 @@
 
 Custom firmware for the **MidiCaptain Mini 6** MIDI foot controller. Replaces the stock firmware with a fully configurable, text-file-driven system for controlling guitar processors, synthesizers, DAWs, and other MIDI gear.
 
+> **Disclaimer:** use at your own risk. The author assumes no reponsibility for any consequence of this software.
+
 ## Why this firmware
 
 The Mini 6 offers easy and open access to its internals, and can become _de facto_ a
