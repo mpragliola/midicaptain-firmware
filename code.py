@@ -407,6 +407,7 @@ async def midi_in_task():
 
 async def main():
     """Launch all tasks concurrently via asyncio cooperative multitasking."""
+    print("- Ultra MIDI Captain - main loop started -")
     await asyncio.gather(
         asyncio.create_task(key_check()),
         asyncio.create_task(disp_task()),
