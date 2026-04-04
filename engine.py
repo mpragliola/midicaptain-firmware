@@ -199,6 +199,8 @@ def switch_page(page_num):
     S.current_page = Page(page_num)
     apply_page()
     if S.current_page.errors:
+        if S.DEBUG:
+            print("[ERR] P{} errors: {}".format(page_num, ", ".join(S.current_page.errors)))
         S.disp.show_errors(S.current_page.errors, page_num)
     else:
         exec_commands(S.current_page.init_commands)
