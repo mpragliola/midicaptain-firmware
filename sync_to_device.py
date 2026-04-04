@@ -141,12 +141,22 @@ def sync(verbose=True):
     changed = 0
     src_files = get_src_files()
 
-    # Wipe ultrasetup/ on device so stale configs are removed
+    # Detect stale files in ultrasetup/ (present on device but not in source)
     dst_ultrasetup = DST / "ultrasetup"
+    src_ultrasetup_rels = {rel for rel in src_files if rel.parts[0] == "ultrasetup"}
+    stale = False
     if dst_ultrasetup.is_dir():
+        for dst_path in dst_ultrasetup.rglob("*"):
+            if dst_path.is_file():
+                rel = dst_path.relative_to(DST)
+                if rel not in src_ultrasetup_rels:
+                    stale = True
+                    break
+
+    if stale:
         shutil.rmtree(dst_ultrasetup)
         if verbose:
-            print("  Cleared ultrasetup/")
+            print("  Cleared ultrasetup/ (stale files removed)")
 
     # Copy new/modified files
     for rel, src_path in src_files.items():
