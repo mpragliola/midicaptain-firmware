@@ -12,7 +12,7 @@ import sys
 import time
 import shutil
 import hashlib
-import ctypes
+import subprocess
 from pathlib import Path
 
 SRC = Path(__file__).parent
@@ -22,39 +22,74 @@ SYNC_EXTRA = ["license"]   # root-level file or dir (handled generically)
 
 
 # ---------------------------------------------------------------------------
-# Drive detection
+# Drive detection  (stdlib only, no pip required)
 # ---------------------------------------------------------------------------
 
-def _volume_label(drive: Path) -> str:
-    buf = ctypes.create_unicode_buffer(256)
-    try:
-        ctypes.windll.kernel32.GetVolumeInformationW(
-            str(drive) + "\\", buf, len(buf), None, None, None, None, 0
-        )
-        return buf.value
-    except Exception:
-        return ""
+def _iter_mounts():
+    """Yield Path objects for all mounted drives/volumes."""
+    if sys.platform == "win32":
+        for letter in "ABCDEFGHIJKLMNOPQRSTUVWXYZ":
+            p = Path(f"{letter}:/")
+            if p.exists():
+                yield p
+    elif sys.platform == "darwin":
+        base = Path("/Volumes")
+        if base.exists():
+            yield from (p for p in base.iterdir() if p.is_dir())
+    else:  # Linux
+        for base in (Path("/media"), Path("/mnt")):
+            if base.exists():
+                for p in base.rglob("*"):
+                    try:
+                        if p.is_mount():
+                            yield p
+                    except OSError:
+                        pass
 
 
 def find_midicaptain() -> Path | None:
-    for letter in "ABCDEFGHIJKLMNOPQRSTUVWXYZ":
-        drive = Path(f"{letter}:/")
+    """Find a mounted CircuitPython device by its boot_out.txt marker."""
+    for mount in _iter_mounts():
         try:
-            if drive.exists() and _volume_label(drive) == "MIDICAPTAIN":
-                return drive
+            if (mount / "boot_out.txt").is_file():
+                return mount
         except OSError:
             pass
     return None
 
 
 def is_readonly(drive: Path) -> bool:
-    probe = drive / ".sync_probe"
-    try:
-        probe.write_bytes(b"")
-        probe.unlink()
+    """Detect read-only mount without writing to the device."""
+    if sys.platform == "win32":
+        import ctypes
+        FILE_READ_ONLY_VOLUME = 0x00080000
+        flags = ctypes.c_ulong(0)
+        try:
+            ok = ctypes.windll.kernel32.GetVolumeInformationW(
+                str(drive) + "\\", None, 0, None, None, ctypes.byref(flags), None, 0
+            )
+            return bool(flags.value & FILE_READ_ONLY_VOLUME) if ok else True
+        except Exception:
+            return True
+    else:
+        mount_str = str(drive)
+        # Linux: /proc/mounts
+        try:
+            for line in Path("/proc/mounts").read_text().splitlines():
+                parts = line.split()
+                if len(parts) >= 4 and parts[1] == mount_str:
+                    return "ro" in parts[3].split(",")
+        except OSError:
+            pass
+        # macOS: mount command
+        try:
+            out = subprocess.check_output(["mount"], text=True, stderr=subprocess.DEVNULL)
+            for line in out.splitlines():
+                if mount_str in line:
+                    return "read-only" in line or "(ro," in line or ",ro," in line
+        except Exception:
+            pass
         return False
-    except OSError:
-        return True
 
 
 def drive_present(drive: Path) -> bool:
@@ -74,6 +109,8 @@ def _collect_src() -> dict:
 
     # Root *.py files only
     for p in SRC.glob("*.py"):
+        if p.name == Path(__file__).name:
+            continue
         files[p.relative_to(SRC)] = p
 
     # Directories and extra items
@@ -109,12 +146,22 @@ def _collect_dst(dst: Path) -> set:
 # Hashing
 # ---------------------------------------------------------------------------
 
+_TEXT_EXTS = {".py", ".txt", ".md", ".json", ".ini", ".cfg", ".toml"}
+
+
+def _read_normalized(path: Path) -> bytes:
+    """Read file bytes, normalizing CRLF -> LF for text files."""
+    with open(path, "rb") as f:
+        data = f.read()
+    if path.suffix.lower() in _TEXT_EXTS:
+        data = data.replace(b"\r\n", b"\n")
+    return data
+
+
 def _hash(path: Path) -> str | None:
     try:
         h = hashlib.md5()
-        with open(path, "rb") as f:
-            for chunk in iter(lambda: f.read(8192), b""):
-                h.update(chunk)
+        h.update(_read_normalized(path))
         return h.hexdigest()
     except OSError:
         return None
@@ -171,7 +218,7 @@ def full_sync(dst: Path, synced: dict) -> int:
 
         try:
             dst_path.parent.mkdir(parents=True, exist_ok=True)
-            shutil.copy2(src_path, dst_path)
+            dst_path.write_bytes(_read_normalized(src_path))
             synced[rel] = src_h
             tag = "A" if is_new else "U"
             print(f"  {tag} {rel}")
