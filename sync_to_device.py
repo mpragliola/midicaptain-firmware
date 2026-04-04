@@ -171,10 +171,10 @@ def sync(verbose=True, synced_src_hashes=None):
     # Copy new/modified files
     for rel, src_path in src_files.items():
         src_h = file_hash(src_path)
-        # Skip if source hasn't changed since we last synced it
-        if synced_src_hashes is not None and synced_src_hashes.get(rel) == src_h:
-            continue
         dst_path = DST / rel
+        # Skip if source hasn't changed since we last synced it AND file is present
+        if synced_src_hashes is not None and synced_src_hashes.get(rel) == src_h and dst_path.exists():
+            continue
         if dst_path.exists() and file_hash(dst_path) == src_h:
             # Device content matches source -- record and skip copy
             if synced_src_hashes is not None:
