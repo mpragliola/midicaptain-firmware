@@ -136,8 +136,13 @@ def free_space():
     return f"{kb:.1f} KB free"
 
 
-def sync(verbose=True):
-    """One-shot sync from E: to G:. Returns number of files changed."""
+def sync(verbose=True, synced_src_hashes=None):
+    """One-shot sync from E: to G:. Returns number of files changed.
+
+    synced_src_hashes: optional dict {rel: src_hash} of files already synced
+    this session. Files whose source hash hasn't changed since last sync are
+    skipped even if the device modified them (e.g. line-ending normalization).
+    """
     changed = 0
     src_files = get_src_files()
 
@@ -155,17 +160,30 @@ def sync(verbose=True):
 
     if stale:
         shutil.rmtree(dst_ultrasetup)
+        if synced_src_hashes is not None:
+            # Force re-sync of all ultrasetup files since we wiped the dir
+            for rel in list(synced_src_hashes):
+                if rel.parts[0] == "ultrasetup":
+                    del synced_src_hashes[rel]
         if verbose:
             print("  Cleared ultrasetup/ (stale files removed)")
 
     # Copy new/modified files
     for rel, src_path in src_files.items():
+        src_h = file_hash(src_path)
+        # Skip if source hasn't changed since we last synced it
+        if synced_src_hashes is not None and synced_src_hashes.get(rel) == src_h:
+            continue
         dst_path = DST / rel
-        if dst_path.exists():
-            if file_hash(src_path) == file_hash(dst_path):
-                continue
+        if dst_path.exists() and file_hash(dst_path) == src_h:
+            # Device content matches source -- record and skip copy
+            if synced_src_hashes is not None:
+                synced_src_hashes[rel] = src_h
+            continue
         dst_path.parent.mkdir(parents=True, exist_ok=True)
         shutil.copy2(src_path, dst_path)
+        if synced_src_hashes is not None:
+            synced_src_hashes[rel] = src_h
         changed += 1
         if verbose:
             print(f"  -> {rel}")
@@ -179,13 +197,17 @@ def watch(interval=2):
     print("Press Ctrl+C to stop.\n")
 
     initial = True
+    # Track source hashes of files we've already synced to avoid re-syncing
+    # files that the device modifies after writing (e.g. line-ending normalization).
+    synced_src_hashes = {}
 
     while True:
         try:
             if not device_available():
                 wait_for_device()
+                synced_src_hashes.clear()
 
-            n = sync()
+            n = sync(synced_src_hashes=synced_src_hashes)
             if n:
                 if initial:
                     print(f"Initial sync: {n} file(s) deployed. {free_space()}\n")
@@ -200,6 +222,7 @@ def watch(interval=2):
 
         except OSError:
             # Device disconnected mid-sync -- loop back to wait for it
+            synced_src_hashes.clear()
             continue
         except KeyboardInterrupt:
             print("\nStopped.")
